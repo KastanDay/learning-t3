@@ -135,11 +135,7 @@ export default function WebsiteIngestForm({
         type: 'webscrape',
       }
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
-      setUploadFiles((prevFiles) =>
-        prevFiles.map((file) =>
-          file.name === url ? { ...file, status: 'ingesting' } : file,
-        ),
-      )
+
       try {
         const response = await scrapeWeb(
           url,
@@ -161,14 +157,6 @@ export default function WebsiteIngestForm({
           await queryClient.invalidateQueries({
             queryKey: ['documents', project_name],
           })
-        } else {
-          // Handle unsuccessful crawl
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'error' } : file,
-            ),
-          )
-          throw new Error('Crawl was not successful')
         }
       } catch (error: unknown) {
         console.error('Error while scraping web:', error)
@@ -215,9 +203,43 @@ export default function WebsiteIngestForm({
     }
   }, [url])
 
-  // if (isLoading) {
-  //   return <Skeleton height={200} width={330} radius={'lg'} />
-  // }
+  useEffect(() => {
+    const checkIngestStatus = async () => {
+      const response = await fetch(
+        `/api/materialsTable/docsInProgress?course_name=${project_name}`,
+      )
+      const data = await response.json();
+      setUploadFiles((prev) => {
+        return prev.map((file) => {
+          if (file.status === 'uploading') {
+            const isIngesting = data?.documents?.some(
+              (doc: { base_url: string }) =>
+                doc.base_url === file.name,
+            )
+            if (isIngesting) {
+              return { ...file, status: 'ingesting' as const }
+            }
+          }
+          else if (file.status === 'ingesting') {
+            const isStillIngesting = data?.documents?.some(
+              (doc: { base_url: string }) =>
+                doc.base_url === file.name,
+            )
+            if (!isStillIngesting) {
+              return { ...file, status: 'complete' as const }
+            }
+          }
+          return file
+        })
+      })
+    }
+    const interval = setInterval(checkIngestStatus, 3000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [project_name])
+
+
   const scrapeWeb = async (
     url: string | null,
     courseName: string | null,

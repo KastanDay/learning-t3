@@ -155,11 +155,6 @@ export default function GitHubIngestForm({
         type: 'github',
       }
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
-      setUploadFiles((prevFiles) =>
-        prevFiles.map((file) =>
-          file.name === url ? { ...file, status: 'ingesting' } : file,
-        ),
-      )
       try {
         const response = await scrapeWeb(
           url,
@@ -180,14 +175,6 @@ export default function GitHubIngestForm({
           await queryClient.invalidateQueries({
             queryKey: ['documents', project_name],
           })
-        } else {
-          // Handle unsuccessful crawl
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'error' } : file,
-            ),
-          )
-          throw new Error('Crawl was not successful')
         }
       } catch (error: any) {
         console.error('Error while scraping web:', error)
@@ -240,6 +227,43 @@ export default function GitHubIngestForm({
       setIsUrlUpdated(false)
     }
   }, [url])
+
+  useEffect(() => {
+    const checkIngestStatus = async () => {
+      const response = await fetch(
+        `/api/materialsTable/docsInProgress?course_name=${project_name}`,
+      )
+      const data = await response.json();
+      setUploadFiles((prev) => {
+        return prev.map((file) => {
+          if (file.status === 'uploading') {
+            const isIngesting = data?.documents?.some(
+              (doc: { url: string }) =>
+                doc.url === file.name,
+            )
+            if (isIngesting) {
+              return { ...file, status: 'ingesting' as const }
+            }
+          }
+          else if (file.status === 'ingesting') {
+            const isStillIngesting = data?.documents?.some(
+              (doc: { url: string }) =>
+                doc.url === file.name,
+            )
+            if (!isStillIngesting) {
+
+              return { ...file, status: 'complete' as const }
+            }
+          }
+          return file
+        })
+      })
+    }
+    const interval = setInterval(checkIngestStatus, 3000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [project_name])
 
   // if (isLoading) {
   //   return <Skeleton height={200} width={330} radius={'lg'} />
