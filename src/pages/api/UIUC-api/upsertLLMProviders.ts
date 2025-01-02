@@ -23,11 +23,10 @@ export default async function handler(
   let defaultTemperature: number
 
   try {
-    const parsedBody = JSON.parse(req.body)
-    courseName = parsedBody.projectName as string
-    llmProviders = parsedBody.llmProviders as AllLLMProviders
-    defaultModelID = parsedBody.defaultModelID as string
-    defaultTemperature = parsedBody.defaultTemperature as number
+    courseName = req.body.projectName as string
+    llmProviders = req.body.llmProviders as AllLLMProviders
+    defaultModelID = req.body.defaultModelID as string
+    defaultTemperature = req.body.defaultTemperature as number
   } catch (error) {
     console.error('Error parsing request body:', error)
     return res.status(400).json({ error: 'Invalid request body' })
