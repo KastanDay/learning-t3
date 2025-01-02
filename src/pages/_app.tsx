@@ -60,16 +60,6 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
         console.error('Failed to check maintenance mode:', error)
         setIsMaintenanceMode(false)
       }
-
-      try {
-        const response = await fetch('/api/UIUC-api/getMaintenanceModeFastSupabase')
-        const data = await response.json()
-        console.log("Maintenance mode", data)
-        setIsMaintenanceMode(data.isMaintenanceMode)
-      } catch (error) {
-        console.error('Failed to check maintenance mode:', error)
-        setIsMaintenanceMode(false)
-      }
     }
 
     checkMaintenanceMode()

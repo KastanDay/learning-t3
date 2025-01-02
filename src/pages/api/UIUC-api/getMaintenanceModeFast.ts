@@ -7,10 +7,10 @@ export default async function handler(
 ) {
     const startTime = Date.now()
     try {
-        const redisStartTime = Date.now()
+        // const redisStartTime = Date.now()
         const maintenanceStatus = await redisClient.get('maintenance-mode')
 
-        console.log(`[getMaintenanceMode] Redis query took ${Date.now() - redisStartTime}ms`)
+        // console.log(`[getMaintenanceMode] Redis query took ${Date.now() - redisStartTime}ms`)
 
         res.status(200).json({
             isMaintenanceMode: maintenanceStatus === 'true'
