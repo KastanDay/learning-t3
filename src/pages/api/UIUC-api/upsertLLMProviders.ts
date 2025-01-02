@@ -54,12 +54,10 @@ export default async function handler(
   }
 
   try {
-    console.debug('llmProviders BEFORE being cleaned and such', llmProviders)
 
+    // ⚠️ Must JSON.parse the redis data!
     const redisKey = `${courseName}-llms`
-    const existingLLMs = (await redisClient.get(
-      redisKey,
-    )) as ProjectWideLLMProviders
+    const existingLLMs = JSON.parse(await redisClient.get(redisKey) || '{}') as ProjectWideLLMProviders
 
     // Ensure all keys are encrypted, then save to DB.
     const processProviders = async () => {
