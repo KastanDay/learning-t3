@@ -3,7 +3,6 @@ import { NextPage } from 'next'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { CanViewOnlyCourse } from '~/components/UIUC-Components/CanViewOnlyCourse'
-// import { CannotEditCourse } from '~/components/UIUC-Components/CannotEditCourse'
 import { CannotViewCourse } from '~/components/UIUC-Components/CannotViewCourse'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
@@ -20,13 +19,11 @@ const NotAuthorizedPage: NextPage = () => {
     return router.asPath.slice(1).split('/')[0] as string
   }
 
-  const course_name = getCurrentPageName()
-  console.log('not_auth.tsx -- course_name:', course_name)
-
   useEffect(() => {
-    if (!clerk_user.isLoaded) {
+    if (!clerk_user.isLoaded || !router.isReady) {
       return
     }
+    const course_name = getCurrentPageName()
 
     async function fetchCourseMetadata(course_name: string) {
       try {
@@ -34,6 +31,7 @@ const NotAuthorizedPage: NextPage = () => {
           `/api/UIUC-api/getCourseMetadata?course_name=${course_name}`,
         )
 
+        // TODO: replace this with the util functions for fetchCourseMetadata() and with get_user_permission()
         if (response.ok) {
           const data = await response.json()
           if (data.success === false) {
@@ -56,7 +54,7 @@ const NotAuthorizedPage: NextPage = () => {
     fetchCourseMetadata(course_name).then((courseMetadata) => {
       if (courseMetadata == null) {
         console.log('Course does not exist, redirecting to materials page')
-        router.replace(`/${course_name}/materials`)
+        router.replace(`/${course_name}/dashboard`)
         return
       }
 
@@ -91,7 +89,7 @@ const NotAuthorizedPage: NextPage = () => {
             console.log(
               'in [course_name]/index.tsx - Course exists & user is properly authed, CanViewOnlyCourse',
             )
-            router.push(`/${course_name}/materials`)
+            router.push(`/${course_name}/dashboard`)
           } else if (permission_str == 'view') {
             setComponentToRender(
               <CanViewOnlyCourse
@@ -104,7 +102,7 @@ const NotAuthorizedPage: NextPage = () => {
           }
         } else {
           console.log('Course does not exist, redirecting to materials page')
-          router.push(`/${course_name}/materials`)
+          router.push(`/${course_name}/dashboard`)
         }
       } else {
         console.log(
@@ -112,10 +110,10 @@ const NotAuthorizedPage: NextPage = () => {
         )
       }
     })
-  }, [clerk_user.isLoaded])
+  }, [clerk_user.isLoaded, router.isReady])
 
   if (!clerk_user.isLoaded || !componentToRender) {
-    console.log('not_authorized.tsx -- Loading spinner')
+    console.debug('not_authorized.tsx -- Loading spinner')
     return (
       <MainPageBackground>
         <LoadingSpinner />

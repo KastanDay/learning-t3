@@ -196,7 +196,7 @@ li {
   margin: 0 0.3rem 0.3rem 0;
 }
 
-.tag-item > .button {
+.tag-item button {
   background-color: blueviolet;
   width: 22px;
   height: 22px;
@@ -211,6 +211,7 @@ li {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
 }
 
 /* 👆 FOR EmailChips.tsx -- to make nice email input fields. 👆 */
@@ -431,6 +432,20 @@ a[data-footnote-backref] {
   list-style-type: none;
 }
 
+.codeBlock code:has(> span) {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  /* background-color: 'white' !important; */
+  background: 'white' !important;
+}
+
+.codeBlock pre:has(> code) {
+  background-color: #101122 !important;
+}
+
 /* Style for individual list items */
 .linkMarkDown ol li:has(> button) {
   max-width: 150px;
@@ -464,3 +479,18 @@ button.css-s37qmw {
 /* div.css-p472n8 {
   display: none !important;
 } */
+
+@property --r {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes rotating {
+  from {
+    --r: 0deg;
+  }
+  to {
+    --r: 360deg;
+  }
+}

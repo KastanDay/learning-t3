@@ -1,4 +1,5 @@
-import Link from 'next/link' // Import the Link component
+import Link from 'next/link'
+import Image from 'next/image'
 
 export default function Footer({ isNavbar = false }: { isNavbar?: boolean }) {
   return (
@@ -57,6 +58,20 @@ export default function Footer({ isNavbar = false }: { isNavbar?: boolean }) {
           </Link>{' '}
           code.
         </span>
+        <div>
+          <Link
+            href="https://status.uiuc.chat"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              src="https://status.uiuc.chat/api/badge/1/uptime/24?label=Uptime%2024%20hours"
+              alt="Service Uptime Badge"
+              width={110}
+              height={50}
+            />
+          </Link>
+        </div>
       </div>
     </footer>
   )

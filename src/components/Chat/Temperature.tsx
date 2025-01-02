@@ -1,12 +1,10 @@
 import { FC, useContext, useState } from 'react'
-
 import { useTranslation } from 'next-i18next'
-
 import { DEFAULT_TEMPERATURE } from '@/utils/app/const'
-
 import HomeContext from '~/pages/api/home/home.context'
-import { Title } from '@mantine/core'
-import { montserrat_heading } from 'fonts'
+import { Title, Slider } from '@mantine/core' // Import Slider from @mantine/core
+import { montserrat_heading, montserrat_paragraph } from 'fonts'
+import { useMediaQuery } from '@mantine/hooks'
 
 interface Props {
   label: string
@@ -20,53 +18,59 @@ export const TemperatureSlider: FC<Props> = ({
   const {
     state: { conversations },
   } = useContext(HomeContext)
+  const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const lastConversation = conversations[conversations.length - 1]
   const [temperature, setTemperature] = useState(
     lastConversation?.temperature ?? DEFAULT_TEMPERATURE,
   )
   const { t } = useTranslation('chat')
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(event.target.value)
-    setTemperature(newValue)
-    onChangeTemperature(newValue)
+  const handleChange = (value: number) => {
+    setTemperature(value)
+    onChangeTemperature(value)
   }
 
   return (
     <div className="flex flex-col">
       <Title
-        className={`pb-0 pt-4 ${montserrat_heading.variable} font-montserratHeading`}
-        order={4}
+        className={`px-4 pt-4 ${montserrat_heading.variable} rounded-lg bg-[#15162c] p-4 font-montserratHeading md:rounded-lg`}
+        color="white"
+        order={isSmallScreen ? 5 : 4}
       >
         {label}
       </Title>
-      <span className="text-[12px] text-sm text-black/50 dark:text-white/50">
-        {t(
-          'Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.',
-        )}
-      </span>
-      <span className="mb-1 mt-2 text-center text-neutral-900 dark:text-neutral-100">
-        {temperature.toFixed(1)}
-      </span>
-      <input
-        className="cursor-pointer"
-        type="range"
-        min={0}
-        max={1}
-        step={0.1}
-        value={temperature}
-        onChange={handleChange}
-      />
-      <ul className="w mt-2 flex justify-between px-[24px] pb-8 text-neutral-900 dark:text-neutral-100">
-        <li className="flex justify-center">
-          <span className="absolute">{t('Precise')}</span>
-        </li>
-        <li className="flex justify-center">
-          <span className="absolute">{t('Neutral')}</span>
-        </li>
-        <li className="flex justify-center">
-          <span className="absolute">{t('Creative')}</span>
-        </li>
-      </ul>
+      <div className="mx-6 my-4 flex flex-col">
+        <span
+          className={`mb-1 mt-2 text-center font-bold text-neutral-100 ${isSmallScreen ? 'text-xs' : ''}`}
+        >
+          {temperature.toFixed(1)}
+        </span>
+        <Slider // Replace the native input with Mantine Slider
+          value={temperature}
+          onChange={handleChange}
+          min={0}
+          max={1}
+          step={0.1}
+          marks={[
+            { value: 0, label: t('Precise') },
+            { value: 0.5, label: t('Neutral') },
+            { value: 1, label: t('Creative') },
+          ]}
+          showLabelOnHover
+          color="grape"
+          className="m-2"
+          size={isSmallScreen ? 'xs' : 'md'}
+          classNames={{
+            markLabel: `mx-2 text-neutral-300 ${montserrat_paragraph.variable} font-montserratParagraph mt-2 ${isSmallScreen ? 'text-xs' : ''}`,
+          }}
+        />
+        <span
+          className={`mt-8 text-left text-gray-400 dark:text-white/50 ${montserrat_paragraph.variable} font-montserratParagraph ${isSmallScreen ? 'text-xs' : 'text-sm'}`}
+        >
+          {t(
+            'Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.',
+          )}
+        </span>
+      </div>
     </div>
   )
 }

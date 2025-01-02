@@ -17,6 +17,7 @@ import { showNotification } from '@mantine/notifications'
 import { type UserResource } from '@clerk/types'
 import { IconCheck, IconCopy, IconExternalLink } from '@tabler/icons-react'
 import { montserrat_heading } from 'fonts'
+import style from 'react-syntax-highlighter/dist/esm/styles/hljs/a11y-dark'
 
 const ApiKeyManagement = ({
   course_name,
@@ -72,7 +73,7 @@ const ApiKeyManagement = ({
     curl: `curl -X POST ${baseUrl}/api/chat-api/chat \\
 	-H "Content-Type: application/json" \\
 	-d '{
-		"model": "gpt-4",
+		"model": "gpt-4o-mini",
 		"messages": [
 			{
 				"role": "system",
@@ -84,70 +85,84 @@ const ApiKeyManagement = ({
 			}
 		],
 		"openai_key": "YOUR-OPENAI-KEY-HERE",
-		"temperature": 0.7,
+    "api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder},
+    "retrieval_only": false,
 		"course_name": "${course_name}",
 		"stream": true,
-		"api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder}
+		"temperature": 0.1
 	}'`,
     python: `import requests
 	
-	url = "${baseUrl}/api/chat-api/chat"
-	headers = {
-		'Content-Type': 'application/json'
-	}
-	data = {
-		"model": "gpt-4",
-		"messages": [
-			{
-				"role": "system",
-				"content": "Your system prompt here"
-			},
-			{
-				"role": "user",
-				"content": "What is in these documents?"
-			}
-		],
-		"openai_key": "YOUR-OPENAI-KEY-HERE",
-		"temperature": 0.7,
-		"course_name": "${course_name}",
-		"stream": true,
-		"api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder}
-	}
-	
-	response = requests.post(url, headers=headers, json=data)
-	print(response.text)`,
+url = "${baseUrl}/api/chat-api/chat"
+headers = {
+  'Content-Type': 'application/json'
+}
+stream = True
+data = {
+  "model": "gpt-4o-mini",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Your system prompt here"
+    },
+    {
+      "role": "user",
+      "content": "What is in these documents?"
+    }
+  ],
+  "openai_key": "YOUR-OPENAI-KEY-HERE", # only necessary for OpenAI models
+  "api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder},
+  "retrieval_only": False, # If true, the LLM will not be invoked (thus, zero cost). Only relevant documents will be returned.
+  "course_name": "${course_name}",
+  "stream": stream,
+  "temperature": 0.1
+}
+
+response = requests.post(url, headers=headers, json=data, stream=stream)
+# ⚡️ Stream
+if stream: 
+  for chunk in response.iter_content(chunk_size=None):
+    if chunk:
+      print(chunk.decode('utf-8'), end='', flush=True)
+# 🐌 No stream, but it includes the retrieved contexts.
+else:
+  import json
+  res = json.loads(response.text)
+  print(res['message'])
+  print("The contexts used to answer this question:", res['contexts'])`,
     node: `const axios = require('axios');
 	
-	const data = {
-		"model": "gpt-4",
-		"messages": [
-			{
-				"role": "system",
-				"content": "Your system prompt here"
-			},
-			{
-				"role": "user",
-				"content": "What is in these documents?"
-			}
-		],
-		"openai_key": "YOUR-OPENAI-KEY-HERE",
-		"temperature": 0.7,
-		"course_name": "${course_name}",
-		"stream": true,
-		"api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder}
-	};
-	
-	axios.post('${baseUrl}/api/chat-api/chat', data, {
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-	.then((response) => {
-		console.log(response.data);
-	})
-	.catch((error) => {
-		console.error(error);
-	});`,
+const data = {
+  "model": "gpt-4o-mini",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Your system prompt here"
+    },
+    {
+      "role": "user",
+      "content": "What is in these documents?"
+    }
+  ],
+  "openai_key": "YOUR-OPENAI-KEY-HERE", // only necessary for OpenAI models
+  "api_key": ${apiKey ? `"${apiKey}"` : apiKeyPlaceholder},
+  "course_name": "${course_name}",
+  "stream": true,
+  "retrieval_only": false, // If true, the LLM will not be invoked (thus, zero cost). Only relevant documents will be returned.
+  "temperature": 0.1
+};
+
+axios.post('${baseUrl}/api/chat-api/chat', data, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+.then((response) => {
+  console.log(response.data);
+})
+.catch((error) => {
+  console.error(error);
+});`,
   }
 
   useEffect(() => {
@@ -251,7 +266,7 @@ const ApiKeyManagement = ({
       shadow="xs"
       padding="none"
       radius="xl"
-      style={{ maxWidth: '85%', width: '100%', marginTop: '4%' }}
+      style={{ maxWidth: '85%', width: '100%', marginTop: '2%' }}
     >
       <Flex
         direction={isSmallScreen ? 'column' : 'row'}
@@ -301,7 +316,7 @@ const ApiKeyManagement = ({
                   rel="noopener noreferrer"
                   className={`text-purple-500 hover:underline ${montserrat_heading.variable} font-montserratHeading`}
                 >
-                  OpenAI API documentation
+                  OpenAI API documentation{' '}
                   <IconExternalLink
                     className="mr-2 inline-block"
                     style={{ position: 'relative', top: '-3px' }}
@@ -309,7 +324,33 @@ const ApiKeyManagement = ({
                 </a>
               </Title>
               <Title order={4} w={'90%'}>
-                Just add your{' '}
+                <code
+                  style={{
+                    backgroundColor: '#020307',
+                    borderRadius: '5px',
+                    padding: '1px 5px',
+                    fontFamily: 'monospace',
+                    alignItems: 'center',
+                    justifyItems: 'center',
+                  }}
+                >
+                  llama3.1:70b
+                </code>{' '}
+                is hosted by NCSA and it&apos;s free. However the best
+                price/performance LLM is{' '}
+                <code
+                  style={{
+                    backgroundColor: '#020307',
+                    borderRadius: '5px',
+                    padding: '1px 5px',
+                    fontFamily: 'monospace',
+                    alignItems: 'center',
+                    justifyItems: 'center',
+                  }}
+                >
+                  GPT-4o-mini
+                </code>
+                . For OpenAI models, just add your{' '}
                 <code
                   style={{
                     backgroundColor: '#020307',
@@ -323,6 +364,21 @@ const ApiKeyManagement = ({
                   openai_key
                 </code>{' '}
                 to the request.
+              </Title>
+              <Title order={4} w={'90%'}>
+                Read our UIUC.chat API docs:{' '}
+                <a
+                  href="https://docs.uiuc.chat/api/endpoints"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`text-purple-500 hover:underline ${montserrat_heading.variable} font-montserratHeading`}
+                >
+                  docs.uiuc.chat/api{' '}
+                  <IconExternalLink
+                    className="mr-2 inline-block"
+                    style={{ position: 'relative', top: '-3px' }}
+                  />
+                </a>
               </Title>
               <div
                 style={{
@@ -402,7 +458,7 @@ const ApiKeyManagement = ({
           }}
         >
           <div className="card flex h-full flex-col">
-            <Group position="center" m="3rem" variant="column">
+            <div className="flex w-full flex-col items-center px-3 pt-12">
               <Title
                 className={`label ${montserrat_heading.variable} font-montserratHeading`}
                 variant="gradient"
@@ -415,7 +471,7 @@ const ApiKeyManagement = ({
               {apiKey && (
                 <Input
                   value={apiKey}
-                  className="mt-4 w-[80%] min-w-[5rem]"
+                  className="mt-4 w-full"
                   radius={'xl'}
                   size={'md'}
                   readOnly
@@ -431,9 +487,17 @@ const ApiKeyManagement = ({
                     </Button>
                   }
                   rightSectionWidth={'auto'}
+                  styles={(theme) => ({
+                    input: {
+                      paddingRight: '90px',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                    },
+                  })}
                 />
               )}
-            </Group>
+            </div>
             {!apiKey && !loading && (
               <Button
                 onClick={handleGenerate}
@@ -441,18 +505,24 @@ const ApiKeyManagement = ({
                 size="lg"
                 radius={'xl'}
                 className="min-w-[5rem] self-center rounded-md bg-purple-800 text-white hover:border-indigo-600 hover:bg-indigo-600 hover:text-white focus:shadow-none focus:outline-none"
-                w={'50%'}
+                // w={'60%'}
               >
                 Generate API Key
               </Button>
             )}
             {apiKey && !loading && (
               <>
-                <Group position="center" variant="column" mt="1rem" mb={'3rem'}>
+                <Group
+                  position="center"
+                  variant="column"
+                  mt="1rem"
+                  mb={'3rem'}
+                  pt={'lg'}
+                >
                   <Button
                     onClick={handleRotate}
                     disabled={loading || apiKey === null}
-                    size="lg"
+                    size="md"
                     radius={'xl'}
                     className="min-w-[5rem] rounded-md bg-purple-800 text-white hover:border-indigo-600 hover:bg-indigo-600 hover:text-white focus:shadow-none focus:outline-none"
                     w={'auto'}
@@ -462,7 +532,7 @@ const ApiKeyManagement = ({
                   <Button
                     onClick={handleDelete}
                     disabled={loading || apiKey === null}
-                    size="lg"
+                    size="md"
                     radius={'xl'}
                     className="min-w-[5rem] rounded-md bg-purple-800 text-white hover:border-indigo-600 hover:bg-indigo-600 hover:text-white focus:shadow-none focus:outline-none"
                     w={'auto'}

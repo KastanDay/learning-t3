@@ -1,118 +1,119 @@
 import {
-  OPENAI_API_HOST,
-  OPENAI_API_TYPE,
-  OPENAI_API_VERSION,
-  OPENAI_ORGANIZATION,
-} from '@/utils/app/const'
+  AllLLMProviders,
+  AnthropicProvider,
+  AzureProvider,
+  LLMProvider,
+  NCSAHostedProvider,
+  OllamaProvider,
+  OpenAIProvider,
+  ProviderNames,
+  WebLLMProvider,
+} from '~/utils/modelProviders/LLMProvider'
+import { getOllamaModels } from '~/utils/modelProviders/ollama'
+import { getAzureModels } from '~/utils/modelProviders/azure'
+import { getAnthropicModels } from '~/utils/modelProviders/routes/anthropic'
+import { getWebLLMModels } from '~/utils/modelProviders/WebLLM'
+import { NextApiRequest, NextApiResponse } from 'next'
+import { getNCSAHostedModels } from '~/utils/modelProviders/NCSAHosted'
+import { getOpenAIModels } from '~/utils/modelProviders/routes/openai'
+import { OpenAIModelID } from '~/utils/modelProviders/types/openai'
+import { ProjectWideLLMProviders } from '~/types/courseMetadata'
+import { redisClient } from '~/utils/redisClient'
 
-import { OpenAIModel, OpenAIModelID, OpenAIModels } from '@/types/openai'
-import { decrypt, isEncrypted } from '~/utils/crypto'
-
-export const config = {
-  runtime: 'edge',
-}
-
-const handler = async (req: Request): Promise<Response> => {
-  let apiKey = ''
-  let apiType = OPENAI_API_TYPE
-  let endpoint = OPENAI_API_HOST
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<AllLLMProviders | { error: string }>,
+) {
   try {
-    const { key } = (await req.json()) as {
-      key: string
-    }
-    apiKey = key ? key : (process.env.OPENAI_API_KEY as string)
-    console.log('Validating apikey:', apiKey)
-    // Check if the key starts with 'sk-' (indicating it's not encrypted)
-    if (key && isEncrypted(key)) {
-      // Decrypt the key
-      const decryptedText = await decrypt(
-        key,
-        process.env.NEXT_PUBLIC_SIGNING_KEY as string,
-      )
-      apiKey = decryptedText as string
-      // console.log('models.ts Decrypted api key: ', apiKey)
-    }
-    // console.log('models.ts Final openai key: ', apiKey)
-
-    if (apiKey && !apiKey.startsWith('sk-')) {
-      // console.log('setting azure variables')
-      apiType = 'azure'
-      endpoint = process.env.AZURE_OPENAI_ENDPOINT || OPENAI_API_HOST
+    const { projectName } = req.body as {
+      projectName: string
     }
 
-    if (!apiKey) {
-      return new Response('Warning: OpenAI Key was not found', { status: 400 })
+    if (!projectName) {
+      return res.status(400).json({ error: 'Missing project name' })
     }
 
-    let url = `${endpoint}/v1/models`
-    if (apiType === 'azure') {
-      url = `${endpoint}/openai/deployments?api-version=${OPENAI_API_VERSION}`
+    // Fetch the project's API keys
+    let llmProviders: ProjectWideLLMProviders
+    const redisValue = await redisClient.get(`${projectName}-llms`)
+    if (!redisValue) {
+      llmProviders = {} as ProjectWideLLMProviders
+    } else {
+      llmProviders = JSON.parse(redisValue) as ProjectWideLLMProviders
     }
 
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiType === 'openai' && {
-          Authorization: `Bearer ${apiKey}`,
-        }),
-        ...(apiType === 'azure' && {
-          'api-key': `${apiKey}`,
-        }),
-        ...(apiType === 'openai' &&
-          OPENAI_ORGANIZATION && {
-            'OpenAI-Organization': OPENAI_ORGANIZATION,
-          }),
-      },
+    // Define a function to create a placeholder provider with default values
+    const createPlaceholderProvider = (
+      providerName: ProviderNames,
+    ): LLMProvider => ({
+      provider: providerName,
+      enabled: false,
+      models: [],
     })
 
-    if (response.status === 401) {
-      return new Response(response.body, {
-        status: 500,
-        headers: response.headers,
-      })
-    } else if (response.status !== 200) {
-      console.error(
-        `OpenAI API returned an error ${
-          response.status
-        }: ${await response.text()}`,
-      )
-      throw new Error('OpenAI API returned an error')
+    // Ensure all providers are defined
+    const allProviderNames = Object.values(ProviderNames)
+    for (const providerName of allProviderNames) {
+      if (!llmProviders[providerName]) {
+        // @ts-ignore -- I can't figure out why Ollama complains about undefined.
+        llmProviders[providerName] = createPlaceholderProvider(providerName)
+      }
     }
 
-    const json = await response.json()
+    // Ensure defaultModel and defaultTemp are set
+    if (!llmProviders.defaultModel) {
+      llmProviders.defaultModel = OpenAIModelID.GPT_4o_mini
+    }
+    if (!llmProviders.defaultTemp) {
+      llmProviders.defaultTemp = 0.1
+    }
 
-    const uniqueModels: string[] = Array.from(
-      new Set(json.data.map((model: any) => model.id)),
-    )
+    const allLLMProviders: Partial<AllLLMProviders> = {}
 
-    // console.log('Unique models: ', uniqueModels)
+    // Iterate through all possible providers
+    for (const providerName of Object.values(ProviderNames)) {
+      const llmProvider = llmProviders[providerName]
 
-    const models: OpenAIModel[] = uniqueModels
-      .map((modelId: string) => {
-        const model = json.data.find((m: any) => m.id === modelId)
-        if (!model) return undefined
+      switch (providerName) {
+        case ProviderNames.Ollama:
+          allLLMProviders[providerName] = (await getOllamaModels(
+            llmProvider as OllamaProvider,
+          )) as OllamaProvider
+          break
+        case ProviderNames.OpenAI:
+          allLLMProviders[providerName] = await getOpenAIModels(
+            llmProvider as OpenAIProvider,
+            projectName,
+          )
+          break
+        case ProviderNames.Azure:
+          allLLMProviders[providerName] = await getAzureModels(
+            llmProvider as AzureProvider,
+          )
+          break
+        case ProviderNames.Anthropic:
+          allLLMProviders[providerName] = await getAnthropicModels(
+            llmProvider as AnthropicProvider,
+          )
+          break
+        case ProviderNames.WebLLM:
+          allLLMProviders[providerName] = await getWebLLMModels(
+            llmProvider as WebLLMProvider,
+          )
+          break
+        case ProviderNames.NCSAHosted:
+          allLLMProviders[providerName] = await getNCSAHostedModels(
+            llmProvider as NCSAHostedProvider,
+          )
+          break
+        default:
+          console.warn(`Unhandled provider: ${providerName}`)
+      }
+    }
 
-        for (const [key, value] of Object.entries(OpenAIModelID)) {
-          if (value === model.id) {
-            return {
-              id: model.id,
-              name: OpenAIModels[value].name,
-              maxLength: OpenAIModels[value].maxLength,
-              tokenLimit: OpenAIModels[value].tokenLimit,
-            }
-          }
-        }
-        return undefined
-      })
-      .filter((model): model is OpenAIModel => model !== undefined)
-
-    // console.log('Final list of Models: ', models)
-
-    return new Response(JSON.stringify(models), { status: 200 })
+    return res.status(200).json(allLLMProviders as AllLLMProviders)
   } catch (error) {
     console.error(error)
-    return new Response('Error', { status: 500 })
+    return res.status(500).json({ error: JSON.stringify(error) })
   }
 }
-
-export default handler

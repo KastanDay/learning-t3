@@ -1,57 +1,60 @@
-// import { NextRequest, NextResponse } from 'next/server';
-// import { get, getAll } from '@vercel/edge-config';
-// const configItems = await getAll();
+import { NextResponse } from 'next/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import type { NextRequest } from 'next/server'
+import { type NextFetchEvent } from 'next/server'
 
-// export const config = { matcher: '/*' };
+// Private by default, public routes are defined below (regex)
+const isPublicRoute = createRouteMatcher([
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api(.*)',
+  '/', // landing page
+  '/:singleLevel([^/]+)', // single level path
+  '/:singleLevel([^/]+)/chat', // course chat pages
+])
 
-// export async function middleware() {
-//   const greeting = await get('greeting');
-//   return NextResponse.json(greeting);
-// }
+// Create a middleware handler that runs before Clerk
+function materialsRedirectMiddleware(request: NextRequest) {
+  const url = request.nextUrl
+  // Check if the URL matches the pattern /{project_name}/materials
+  const materialsPattern = /^\/([^\/]+)\/materials$/
+  const match = url.pathname.match(materialsPattern)
 
-import { authMiddleware } from '@clerk/nextjs'
+  if (match) {
+    // Get the project_name from the URL
+    const projectName = match[1]
+    // Create the new URL for redirection
+    const newUrl = new URL(`/${projectName}/dashboard`, url)
+    return NextResponse.redirect(newUrl)
+  }
 
-export default authMiddleware({
-  publicRoutes: (req) => {
-    if (req.nextUrl.pathname.startsWith('/api/chat-api/keys')) {
-      return false
+  return null
+}
+
+// Combine the middlewares
+export default async function middleware(request: NextRequest) {
+  // First check for materials redirect
+  const redirectResponse = materialsRedirectMiddleware(request)
+  if (redirectResponse) return redirectResponse
+
+  // Then proceed with Clerk middleware
+  const authMiddleware = clerkMiddleware((auth) => {
+    if (!isPublicRoute(request)) {
+      auth().protect()
     }
-    // Check if the URL path starts with /api/chat-api/stream or is exactly '/'
-    if (
-      req.nextUrl.pathname.startsWith('/api/chat-api/stream') ||
-      req.nextUrl.pathname === '/' ||
-      req.nextUrl.pathname.startsWith('/api')
-    ) {
-      return true
-    }
+  })
 
-    // Check if the URL path matches the dynamic route pattern for course chat pages
-    const courseChatRegex = /^\/[^\/]+\/chat$/
-    if (courseChatRegex.test(req.nextUrl.pathname)) {
-      return true
-    }
-    const courseGPT4Regex = /^\/[^\/]+\/gpt4$/
-    if (courseGPT4Regex.test(req.nextUrl.pathname)) {
-      return true
-    }
+  // Pass both request and event arguments
+  return authMiddleware(request, {} as NextFetchEvent)
+}
 
-    // Check if the URL path has a single level
-    const singleLevelPathRegex = /^\/[^\/]+$/
-    if (singleLevelPathRegex.test(req.nextUrl.pathname)) {
-      return true
-    }
-
-    // Default to not public
-    return false
-  },
-})
-
-// Stop Middleware from running on static files
+// Update the matcher to include the materials routes
 export const config = {
   matcher: [
     '/((?!.*\\..*|_next).*)',
     '/',
     '/(api|trpc)/(.*)',
-    '/\\[course_name\\]/gpt4', // Add this line to match the route
+    '/\\[course_name\\]/gpt4',
+    '/:path*/materials', // Add this line to match materials routes
   ],
 }

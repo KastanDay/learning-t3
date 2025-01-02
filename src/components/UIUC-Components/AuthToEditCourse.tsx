@@ -48,9 +48,12 @@ export const AuthComponent = ({ course_name }: { course_name: string }) => {
             {/* Wrapping a button makes it easy to style the sign-in link. */}
             <SignInButton
               mode="modal"
-              redirectUrl={
-                course_name === 'new' ? '/new' : `/${course_name}/materials`
+              fallbackRedirectUrl={
+                course_name === 'new' ? '/new' : `/${course_name}/dashboard`
               }
+              // redirectUrl={
+              //   course_name === 'new' ? '/new' : `/${course_name}/dashboard`
+              // }
             >
               <Button
                 className="kas-gradient-text btn"

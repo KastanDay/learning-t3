@@ -67,7 +67,7 @@ export async function getStuffedPrompt(
       return searchQuery
     }
 
-    tokenLimit = tokenLimit - 2001 // for the completion. We always reserve 1k + some for the system prompt I think...
+    tokenLimit = tokenLimit - 1500 // for the completion. We always reserve 1k + some for the system prompt I think...
 
     const encoding = new Tiktoken(
       tiktokenModel.bpe_ranks,
@@ -82,9 +82,9 @@ export async function getStuffedPrompt(
         d.pagenumber ? ', page: ' + d.pagenumber : ''
       }\n${d.text}\n`
       const numTokens = encoding.encode(docString).length
-      console.log(
-        `token_counter: ${tokenCounter}, num_tokens: ${numTokens}, token_limit: ${tokenLimit}`,
-      )
+      // console.log(
+      //   `token_counter: ${tokenCounter}, num_tokens: ${numTokens}, token_limit: ${tokenLimit}`,
+      // )
       if (tokenCounter + numTokens <= tokenLimit) {
         tokenCounter += numTokens
         validDocs.push({ index, d })

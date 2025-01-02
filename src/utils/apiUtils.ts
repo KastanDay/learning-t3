@@ -1,15 +1,17 @@
 // utils/apiUtils.ts
 import {
-  CourseMetadataOptionalForUpsert,
+  type CourseMetadataOptionalForUpsert,
   type CourseMetadata,
 } from '~/types/courseMetadata'
-import { log } from 'next-axiom'
 import { v4 as uuidv4 } from 'uuid'
-import { getBaseUrl } from './api'
 
 // Configuration for runtime environment
-export const config = {
-  runtime: 'edge',
+
+
+export const getBaseUrl = () => {
+  if (typeof window !== 'undefined') return '' // browser should use relative url
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}` // SSR should use vercel url
+  return `http://localhost:${process.env.PORT ?? 3000}` // dev SSR should use localhost
 }
 
 /**
@@ -32,20 +34,20 @@ export const callSetCourseMetadata = async (
     const data = await response.json()
 
     if (data.success) {
-      log.debug('Course metadata updated successfully', {
-        course_name: courseName,
-        course_metadata: courseMetadata,
-      })
+      // console.debug('Course metadata updated successfully', {
+      //   course_name: courseName,
+      //   course_metadata: courseMetadata,
+      // })
       return true
     } else {
-      log.error('Error setting course metadata', {
+      console.error('Error setting course metadata', {
         course_name: courseName,
         error: data.error,
       })
       return false
     }
   } catch (error) {
-    log.error('Error setting course metadata', {
+    console.error('Error setting course metadata', {
       course_name: courseName,
       error,
     })
@@ -90,10 +92,10 @@ export const uploadToS3 = async (
     formData.append('file', file)
 
     await fetch(url, { method: 'POST', body: formData })
-    log.info('File uploaded to S3 successfully', { file_name: file.name })
+    console.debug('File uploaded to S3 successfully', { file_name: file.name })
     return fields.key
   } catch (error) {
-    log.error('Error uploading file to S3', { error })
+    console.error('Error uploading file to S3', { error })
   }
 }
 
@@ -120,7 +122,7 @@ export async function fetchPresignedUrl(
     const data = await response.json()
     return data.url
   } catch (error) {
-    log.error('Error fetching presigned URL', { error })
+    console.error('Error fetching presigned URL', { error })
     return null
   }
 }
@@ -158,7 +160,7 @@ export async function fetchCourseMetadata(course_name: string): Promise<any> {
 
     return data.course_metadata
   } catch (error) {
-    log.error('Error fetching course metadata', { course_name, error })
+    console.error('Error fetching course metadata', { course_name, error })
     throw error
   }
 }

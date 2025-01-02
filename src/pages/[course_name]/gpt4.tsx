@@ -5,10 +5,9 @@ import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackgro
 
 const Gpt4 = () => {
   const router = useRouter()
-  // const { course_name } = router.query
 
   const getCurrentPageName = () => {
-    // /CS-125/materials --> CS-125
+    // /CS-125/dashboard --> CS-125
     return router.asPath.slice(1).split('/')[0] as string
   }
 
@@ -16,7 +15,7 @@ const Gpt4 = () => {
     if (!router.isReady) return
 
     router.replace(`/${getCurrentPageName()}/chat`)
-  }, [router])
+  }, [router.isReady])
 
   return (
     <MainPageBackground>

@@ -15,6 +15,7 @@ import {
   List,
 } from '@mantine/core'
 import {
+  IconAlertCircle,
   IconHome,
   IconSitemap,
   IconSubtask,
@@ -29,6 +30,12 @@ import { callSetCourseMetadata } from '~/utils/apiUtils'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useRef } from 'react'
 import { LoadingSpinner } from './LoadingSpinner'
+import { Montserrat } from 'next/font/google'
+
+const montserrat_med = Montserrat({
+  weight: '500',
+  subsets: ['latin'],
+})
 
 interface WebScrapeProps {
   is_new_course: boolean
@@ -143,6 +150,32 @@ export const WebScrape = ({
   const handleSubmit = async () => {
     if (validateUrl(url)) {
       setLoadingSpinner(true)
+
+      if (is_new_course) {
+        // set course exists in new metadata endpoint
+        const response = await callSetCourseMetadata(courseName, {
+          course_owner: current_user_email,
+          // Don't set properties we don't know about. We'll just upsert and use the defaults.
+          course_admins: [],
+          approved_emails_list: [],
+          is_private: false,
+          banner_image_s3: undefined,
+          course_intro_message: undefined,
+          openai_api_key: undefined,
+          example_questions: undefined,
+          system_prompt: undefined,
+          disabled_models: undefined,
+          project_description: undefined,
+          documentsOnly: undefined,
+          guidedLearning: undefined,
+          systemPromptOnly: undefined,
+          vector_search_rewrite_disabled: undefined,
+        })
+        if (!response) {
+          throw new Error('Error while setting course metadata')
+        }
+      }
+
       let data = null
       // Make API call based on URL
       if (url.includes('coursera.org')) {
@@ -154,110 +187,51 @@ export const WebScrape = ({
         data = downloadMITCourse(url, courseName, 'local_dir') // no await -- do in background
 
         showToast()
-
-        if (is_new_course) {
-          // set course exists in new metadata endpoint
-          const response = await callSetCourseMetadata(courseName, {
-            course_owner: current_user_email,
-            // Don't set properties we don't know about. We'll just upsert and use the defaults.
-            course_admins: [],
-            approved_emails_list: [],
-            is_private: false,
-            banner_image_s3: undefined,
-            course_intro_message: undefined,
-            openai_api_key: undefined,
-            example_questions: undefined,
-            system_prompt: undefined,
-            disabled_models: undefined,
-          })
-
-          if (!response) {
-            throw new Error('Error while setting course metadata')
-          }
-        }
-        await router.push(`/${courseName}/materials`)
       } else if (url.includes('canvas.illinois.edu/courses/')) {
-        const canvasCourseIdParts = url.split('canvas.illinois.edu/courses/')
-        const canvasCourseId = canvasCourseIdParts[1]?.split('/')[0]
-
-        try {
-          const response = await axios.get(
-            'https://flask-production-751b.up.railway.app/ingestCanvas',
-            {
-              params: {
-                course_id: canvasCourseId,
-                course_name: courseName,
-                files: selectedCanvasOptions.includes('files')
-                  ? 'true'
-                  : 'false',
-                pages: selectedCanvasOptions.includes('pages')
-                  ? 'true'
-                  : 'false',
-                modules: selectedCanvasOptions.includes('modules')
-                  ? 'true'
-                  : 'false',
-                syllabus: selectedCanvasOptions.includes('syllabus')
-                  ? 'true'
-                  : 'false',
-                assignments: selectedCanvasOptions.includes('assignments')
-                  ? 'true'
-                  : 'false',
-                discussions: selectedCanvasOptions.includes('discussions')
-                  ? 'true'
-                  : 'false',
-              },
-            },
-          )
-
-          if (response.data.outcome) {
-            console.log('Canvas content ingestion was successful!')
-            // Navigate to the course materials page or any other success behavior
-            await router.push(`/${courseName}/materials`)
-          } else {
-            console.error('Canvas content ingestion failed.')
-            // Handle the failure, maybe show a notification or alert to the user
-          }
-        } catch (error) {
-          console.error('Error while ingesting Canvas content:', error)
+        const response = await fetch('/api/UIUC-api/ingestCanvas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            courseName: courseName,
+            canvas_url: url,
+            selectedCanvasOptions: selectedCanvasOptions,
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
         }
+        if (data && data.error) {
+          throw new Error(data.error)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 8000)) // wait a moment before redirecting
+        console.log('Canvas content ingestion was successful!')
       } else {
         // Standard web scrape
-        data = await scrapeWeb(
-          url,
-          courseName,
-          maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
-          scrapeStrategy,
-        )
-        // let ingest finalize things. It should be finished, but the DB is slow.
-        await new Promise((resolve) => setTimeout(resolve, 3000))
-
-        if (is_new_course) {
-          // set course exists in fast course_metadatas KV db
-          const response = await callSetCourseMetadata(courseName, {
-            course_owner: current_user_email,
-            // Don't set properties we don't know about. We'll just upsert and use the defaults.
-            course_admins: [],
-            approved_emails_list: [],
-            is_private: false,
-            banner_image_s3: undefined,
-            course_intro_message: undefined,
-            openai_api_key: undefined,
-            example_questions: undefined,
-            system_prompt: undefined,
-            disabled_models: undefined,
-          })
-          if (!response) {
-            throw new Error('Error while setting course metadata')
-          }
-          await router.push(`/${courseName}/materials`)
+        try {
+          await scrapeWeb(
+            url,
+            courseName,
+            maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
+            scrapeStrategy,
+          )
+        } catch (error: any) {
+          console.error('Error while scraping web:', error)
         }
+        // let ingest finalize things. It should be finished, but the DB is slow.
+        await new Promise((resolve) => setTimeout(resolve, 8000))
       }
     } else {
       alert('Invalid URL (please include https://)')
     }
     setLoadingSpinner(false)
     setUrl('') // clear url
-    router.reload() // Refresh the page
+    if (is_new_course) {
+      await router.push(`/${courseName}/dashboard`)
+    }
+    // No need to refresh, our materials table auto-refreshes.
   }
 
   const [inputErrors, setInputErrors] = useState({
@@ -364,9 +338,40 @@ export const WebScrape = ({
       )
       console.log('Response from web scraping endpoint:', response.data)
       return response.data
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error during web scraping:', error)
-      return null
+
+      notifications.show({
+        id: 'error-notification',
+        withCloseButton: true,
+        closeButtonProps: { color: 'red' },
+        onClose: () => console.log('error unmounted'),
+        onOpen: () => console.log('error mounted'),
+        autoClose: 12000,
+        title: (
+          <Text size={'lg'} className={`${montserrat_med.className}`}>
+            {'Error during web scraping. Please try again.'}
+          </Text>
+        ),
+        message: (
+          <Text className={`${montserrat_med.className} text-neutral-200`}>
+            {error.message}
+          </Text>
+        ),
+        color: 'red',
+        radius: 'lg',
+        icon: <IconAlertCircle />,
+        className: 'my-notification-class',
+        style: {
+          backgroundColor: 'rgba(42,42,64,0.3)',
+          backdropFilter: 'blur(10px)',
+          borderLeft: '5px solid red',
+        },
+        withBorder: true,
+        loading: false,
+      })
+      // return error
+      // throw error
     }
   }
 
@@ -411,10 +416,8 @@ export const WebScrape = ({
 
   useEffect(() => {
     if (url && url.length > 0 && validateUrl(url)) {
-      console.log('url updated : ', url)
       setIsUrlUpdated(true)
     } else {
-      console.log('url empty')
       setIsUrlUpdated(false)
     }
   }, [url])
@@ -440,7 +443,7 @@ export const WebScrape = ({
             icon={icon}
             // I can't figure out how to change the background colors.
             className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-purple-200 lg:w-[75%]`}
-            wrapperProps={{ borderRadius: 'xl' }}
+            // wrapperProps={{ borderRadius: 'xl' }}
             // styles={{ input: { backgroundColor: '#1A1B1E' } }}
             styles={{
               input: {
@@ -552,7 +555,7 @@ export const WebScrape = ({
             icon={icon}
             // I can't figure out how to change the background colors.
             className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-purple-200 lg:w-[75%]`}
-            wrapperProps={{ borderRadius: 'xl' }}
+            // wrapperProps={{ borderRadius: 'xl' }}
             // styles={{ input: { backgroundColor: '#1A1B1E' } }}
             styles={{
               input: {

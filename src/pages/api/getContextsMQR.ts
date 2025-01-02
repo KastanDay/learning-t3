@@ -5,15 +5,17 @@ export const fetchMQRContexts = async (
   course_name: string,
   search_query: string,
   token_limit = 6000,
+  doc_groups: string[] = [],
 ) => {
   try {
     const response: AxiosResponse<ContextWithMetadata[]> = await axios.get(
-      `https://flask-production-751b.up.railway.app/getTopContextsWithMQR`,
+      `https://flask-doc-groups.up.railway.app/getTopContextsWithMQR`,
       {
         params: {
           course_name: course_name,
           search_query: search_query,
           token_limit: token_limit,
+          doc_groups: doc_groups,
         },
       },
     )

@@ -7,18 +7,34 @@ import {
   Message,
 } from '~/types/chat'
 import { CourseMetadata } from '~/types/courseMetadata'
-import { decrypt } from './crypto'
+import { decrypt, decryptKeyIfNeeded } from './crypto'
 import { OpenAIError } from './server'
-import { OpenAIModel, OpenAIModelID, OpenAIModels } from '~/types/openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { replaceCitationLinks } from './citations'
 import { fetchImageDescription } from '~/pages/api/UIUC-api/fetchImageDescription'
-import { getBaseUrl } from './api'
+import { getBaseUrl } from '~/utils/apiUtils'
 import posthog from 'posthog-js'
+import {
+  AllLLMProviders,
+  AllSupportedModels,
+  AnthropicProvider,
+  GenericSupportedModel,
+  NCSAHostedProvider,
+  OllamaProvider,
+  VisionCapableModels,
+} from '~/utils/modelProviders/LLMProvider'
+import fetchMQRContexts from '~/pages/api/getContextsMQR'
+import fetchContexts from '~/pages/api/getContexts'
+import { OllamaModelIDs } from './modelProviders/ollama'
+import { webLLMModels } from './modelProviders/WebLLM'
+import { OpenAIModelID } from './modelProviders/types/openai'
+import { v4 as uuidv4 } from 'uuid'
+import { AzureModelID } from './modelProviders/azure'
+import { AnthropicModelID } from './modelProviders/types/anthropic'
+import { NCSAHostedModelID } from './modelProviders/NCSAHosted'
+import { NextApiRequest, NextApiResponse } from 'next'
 
-export const config = {
-  runtime: 'edge',
-}
+export const maxDuration = 60
 
 /**
  * Enum representing the possible states of the state machine used in processing text chunks.
@@ -49,9 +65,12 @@ export async function processChunkWithStateMachine(
   stateMachineContext: { state: State; buffer: string },
   citationLinkCache: Map<number, string>,
 ): Promise<string> {
-  // console.log('in processChunkWithStateMachine with chunk: ', chunk)
   let { state, buffer } = stateMachineContext
   let processedChunk = ''
+
+  if (!chunk) {
+    return ''
+  }
 
   for (let i = 0; i < chunk.length; i++) {
     const char = chunk[i]!
@@ -287,71 +306,86 @@ export async function processChunkWithStateMachine(
 }
 
 /**
+ * Fetches the OpenAI key to use for the request.
+ * @param {string | undefined} openai_key - The OpenAI key provided in the request.
+ * @param {CourseMetadata} courseMetadata - The course metadata containing the fallback OpenAI key.
+ * @returns {Promise<string>} The OpenAI key to use.
+ */
+export async function fetchKeyToUse(
+  openai_key: string | undefined,
+  courseMetadata: CourseMetadata,
+): Promise<string> {
+  return (
+    openai_key ||
+    ((await decryptKeyIfNeeded(
+      courseMetadata.openai_api_key as string,
+    )) as string)
+  )
+}
+
+/**
  * Determines the OpenAI key to use and validates it by checking available models.
  * @param {string | undefined} openai_key - The OpenAI key provided in the request.
  * @param {CourseMetadata} courseMetadata - The course metadata containing the fallback OpenAI key.
  * @param {string} modelId - The model identifier to validate against the available models.
- * @returns {Promise<string>} The validated OpenAI key.
+ * @returns {Promise<{ activeModel: GenericSupportedModel, modelsWithProviders: AllLLMProviders }>} The validated OpenAI key and available models.
  */
-export async function determineAndValidateOpenAIKey(
-  openai_key: string | undefined,
-  courseMetadata: CourseMetadata,
+export async function determineAndValidateModel(
+  keyToUse: string,
   modelId: string,
-): Promise<string> {
-  const keyToUse =
-    openai_key ||
-    ((await decrypt(
-      courseMetadata.openai_api_key as string,
-      process.env.NEXT_PUBLIC_SIGNING_KEY as string,
-    )) as string)
+  projectName: string,
+): Promise<{
+  activeModel: GenericSupportedModel
+  modelsWithProviders: AllLLMProviders
+}> {
+  const baseUrl = getBaseUrl()
 
-  if (keyToUse) {
-    const isModelAvailable = await validateModelWithKey(keyToUse, modelId)
-    if (!isModelAvailable) {
-      throw new Error('Model not available on the key supplied')
-    }
-    return keyToUse
+  const response = await fetch(baseUrl + '/api/models', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ openAIApiKey: keyToUse, projectName }),
+  })
+
+  if (!response.ok) {
+    throw new OpenAIError(
+      `Failed to fetch models: ${response.statusText}`,
+      'api_error',
+      'key',
+      response.status.toString(),
+    )
   }
 
-  throw new Error('No OpenAI key found. OpenAI key is required')
-}
+  const modelsWithProviders = (await response.json()) as AllLLMProviders
+  const availableModels = Object.values(modelsWithProviders)
+    .flatMap((provider) => provider?.models || [])
+    .filter((model) => model.enabled)
 
-/**
- * Calls the models API to validate if the provided model is available for the given key.
- * @param {string} apiKey - The API key to validate.
- * @param {string} modelId - The model identifier to check.
- * @returns {Promise<boolean>} A promise that resolves to a boolean indicating if the model is available.
- */
-export async function validateModelWithKey(
-  apiKey: string,
-  modelId: string,
-): Promise<boolean> {
-  try {
-    const baseUrl = getBaseUrl()
-    console.log('baseUrl:', baseUrl)
-    const response = await fetch(baseUrl + '/api/models', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ key: apiKey }),
-    })
+  if (availableModels.length === 0) {
+    throw new Error('No models are available or enabled for this project.')
+  }
 
-    if (!response.ok) {
-      throw new OpenAIError(
-        `Failed to fetch models: ${response.statusText}`,
-        'api_error',
-        'key',
-        response.status.toString(),
+  const activeModel = availableModels.find(
+    (model) => model.id === modelId,
+  ) as GenericSupportedModel
+
+  if (!activeModel) {
+    console.error(`Model with ID ${modelId} not found in available models.`)
+    throw new Error(
+      `The requested model '${modelId}' is not available in this project. It has likely been restricted by the project's admins. You can enable this model on the admin page here: https://uiuc.chat/${projectName}/dashboard. These models are available to use: ${Array.from(
+        availableModels,
       )
-    }
-
-    const models: OpenAIModel[] = await response.json()
-    return models.some((model) => model.id === modelId)
-  } catch (error) {
-    console.error('Error validating model with key:', error)
-    throw error
+        .filter(
+          (model) =>
+            !webLLMModels.some((webLLMModel) => webLLMModel.id === model.id),
+        )
+        .map((model) => model.id)
+        .join(', ')}`,
+    )
   }
+
+  return { activeModel, modelsWithProviders }
 }
 
 /**
@@ -359,7 +393,7 @@ export async function validateModelWithKey(
  * Throws an error with a specific message when validation fails.
  * @param {ChatApiBody} body - The request body to validate.
  */
-export function validateRequestBody(body: ChatApiBody): void {
+export async function validateRequestBody(body: ChatApiBody): Promise<void> {
   // Check for required fields
   const requiredFields = ['model', 'messages', 'course_name', 'api_key']
   for (const field of requiredFields) {
@@ -367,9 +401,18 @@ export function validateRequestBody(body: ChatApiBody): void {
       throw new Error(`Missing required field: ${field}`)
     }
   }
-
-  if (typeof body.model !== 'string' || !(body.model in OpenAIModels)) {
-    throw new Error('Invalid model provided')
+  // Validate against a static list of all supported models. Don't include the WebLLM since they run in the browser.
+  const apiSupportedModels = Array.from(AllSupportedModels).filter(
+    (model) => !webLLMModels.some((webLLMModel) => webLLMModel.id === model.id),
+  )
+  if (!apiSupportedModels.some((model) => model.id === body.model)) {
+    throw new Error(
+      `Invalid model provided '${body.model}'. Is not one of our supported models: ${Array.from(
+        apiSupportedModels,
+      )
+        .map((model) => model.id)
+        .join(', ')}`,
+    )
   }
 
   if (
@@ -378,7 +421,9 @@ export function validateRequestBody(body: ChatApiBody): void {
     body.messages.length === 0 ||
     !body.messages.some((message) => message.role === 'user')
   ) {
-    throw new Error('Invalid or empty messages provided')
+    throw new Error(
+      'Invalid or empty messages provided. Messages must contain at least one user message.',
+    )
   }
 
   if (
@@ -391,11 +436,13 @@ export function validateRequestBody(body: ChatApiBody): void {
   }
 
   if (typeof body.course_name !== 'string') {
-    throw new Error('Invalid course_name provided')
+    throw new Error(
+      "Invalid course_name provided. 'course_name' must be a string.",
+    )
   }
 
   if (body.stream && typeof body.stream !== 'boolean') {
-    throw new Error('Invalid stream provided')
+    throw new Error("Invalid stream provided. 'stream' must be a boolean.")
   }
 
   const hasImageContent = body.messages.some(
@@ -403,8 +450,13 @@ export function validateRequestBody(body: ChatApiBody): void {
       Array.isArray(message.content) &&
       message.content.some((content) => content.type === 'image_url'),
   )
-  if (hasImageContent && body.model !== OpenAIModelID.GPT_4_VISION) {
-    throw new Error('Invalid model provided for image content')
+  if (
+    hasImageContent &&
+    !VisionCapableModels.has(body.model as OpenAIModelID)
+  ) {
+    throw new Error(
+      `The selected model '${body.model}' does not support vision capabilities. Use one of these: ${Array.from(VisionCapableModels).join(', ')}`,
+    )
   }
 
   // Additional validation for other fields can be added here if needed
@@ -432,6 +484,31 @@ export function constructSearchQuery(messages: Message[]): string {
     .join('\n')
 }
 
+export const handleContextSearch = async (
+  message: Message,
+  courseName: string,
+  selectedConversation: Conversation,
+  searchQuery: string,
+  documentGroups: string[],
+): Promise<ContextWithMetadata[]> => {
+  if (courseName !== 'gpt4') {
+    const token_limit = selectedConversation.model.tokenLimit
+    const useMQRetrieval = false
+
+    const fetchContextsFunc = useMQRetrieval ? fetchMQRContexts : fetchContexts
+    const curr_contexts = await fetchContextsFunc(
+      courseName,
+      searchQuery,
+      token_limit,
+      documentGroups,
+    )
+
+    message.contexts = curr_contexts as ContextWithMetadata[]
+    return curr_contexts as ContextWithMetadata[]
+  }
+  return []
+}
+
 /**
  * Attaches contexts to the last message in the conversation.
  * @param {Message} lastMessage - The last message object in the conversation.
@@ -445,36 +522,6 @@ export function attachContextsToLastMessage(
     lastMessage.contexts = []
   }
   lastMessage.contexts = contexts
-  console.log('lastMessage: ', lastMessage)
-}
-
-/**
- * Constructs the ChatBody object for the chat handler.
- * @param {string} model - The model identifier.
- * @param {Conversation} conversation - The conversation object.
- * @param {string} key - The API key.
- * @param {string} prompt - The prompt for the chat.
- * @param {number} temperature - The temperature setting for the chat.
- * @param {string} course_name - The course name associated with the chat.
- * @param {boolean} stream - A boolean indicating if the response should be streamed.
- * @returns {ChatBody} The constructed ChatBody object.
- */
-export function constructChatBody(
-  conversation: Conversation,
-  key: string,
-  course_name: string,
-  stream: boolean,
-): ChatBody {
-  return {
-    model: conversation.model,
-    messages: conversation.messages,
-    key: key,
-    prompt: conversation.prompt,
-    temperature: conversation.temperature,
-    course_name: course_name,
-    stream: stream,
-    isImage: false,
-  }
 }
 
 /**
@@ -486,17 +533,16 @@ export function constructChatBody(
  * @returns {Promise<NextResponse>} A NextResponse object representing the streaming response.
  */
 export async function handleStreamingResponse(
-  apiResponse: NextResponse,
+  apiResponse: Response,
   conversation: Conversation,
-  req: NextRequest,
+  req: NextApiRequest,
+  res: NextApiResponse,
   course_name: string,
-): Promise<NextResponse> {
+): Promise<void> {
   if (!apiResponse.body) {
     console.error('API response body is null')
-    return new NextResponse(
-      JSON.stringify({ error: 'API response body is null' }),
-      { status: 500 },
-    )
+    res.status(500).json({ error: 'API response body is null' })
+    return
   }
 
   const lastMessage = conversation.messages[
@@ -506,69 +552,58 @@ export async function handleStreamingResponse(
   const citationLinkCache = new Map<number, string>()
   let fullAssistantResponse = ''
 
-  const transformer = new TransformStream({
-    async transform(chunk, controller) {
-      const textDecoder = new TextDecoder()
-      let decodedChunk = textDecoder.decode(chunk, { stream: true })
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
 
-      try {
-        decodedChunk = await processChunkWithStateMachine(
-          decodedChunk,
-          lastMessage,
-          stateMachineContext,
-          citationLinkCache,
-        )
-        fullAssistantResponse += decodedChunk
-      } catch (error) {
-        console.error('Error processing chunk with state machine:', error)
-        controller.error(error)
-        return
-      }
+  try {
+    const decoder = new TextDecoder()
+    const reader = apiResponse.body.getReader()
 
-      const textEncoder = new TextEncoder()
-      const encodedChunk = textEncoder.encode(decodedChunk)
-      controller.enqueue(encodedChunk)
+    while (true) {
+      const { done, value } = await reader.read()
 
-      if (chunk.done) {
-        controller.terminate()
-      }
-    },
-    flush(controller) {
-      const textEncoder = new TextEncoder()
-      if (stateMachineContext.buffer.length > 0) {
-        processChunkWithStateMachine(
-          '',
-          lastMessage,
-          stateMachineContext,
-          citationLinkCache,
-        )
-          .then((finalChunk) => {
-            controller.enqueue(textEncoder.encode(finalChunk))
-            controller.terminate()
-          })
-          .catch((error) => {
-            console.error(
-              'Error processing final chunk with state machine:',
-              error,
-            )
-            controller.error(error)
-          })
-      } else {
-        controller.terminate()
-      }
-      // Append the processed response to the conversation
-      conversation.messages.push({
-        role: 'assistant',
-        content: fullAssistantResponse,
-      })
+      if (done) break
 
-      // Log the conversation to the database
-      updateConversationInDatabase(conversation, course_name, req)
-    },
-  })
+      let decodedChunk = decoder.decode(value, { stream: true })
+      decodedChunk = await processChunkWithStateMachine(
+        decodedChunk,
+        lastMessage,
+        stateMachineContext,
+        citationLinkCache,
+      )
+      fullAssistantResponse += decodedChunk
+      res.write(decodedChunk)
+    }
 
-  const transformedStream = apiResponse.body.pipeThrough(transformer)
-  return new NextResponse(transformedStream)
+    // Handle any remaining buffer
+    if (stateMachineContext.buffer.length > 0) {
+      const finalChunk = await processChunkWithStateMachine(
+        '',
+        lastMessage,
+        stateMachineContext,
+        citationLinkCache,
+      )
+      fullAssistantResponse += finalChunk
+      res.write(finalChunk)
+    }
+
+    // Append the processed response to the conversation
+    conversation.messages.push({
+      id: uuidv4(),
+      role: 'assistant',
+      content: fullAssistantResponse,
+    })
+
+    // Log the conversation to the database
+    await updateConversationInDatabase(conversation, course_name, req)
+  } catch (error) {
+    console.error('Error processing streaming response:', error)
+    res.status(500).json({ error: 'Error processing streaming response' })
+  } finally {
+    res.end()
+  }
 }
 
 /**
@@ -582,7 +617,7 @@ export async function handleStreamingResponse(
 async function processResponseData(
   data: string,
   conversation: Conversation,
-  req: NextRequest,
+  req: NextApiRequest,
   course_name: string,
 ): Promise<string> {
   const lastMessage = conversation.messages[
@@ -608,24 +643,24 @@ async function processResponseData(
 
 /**
  * Handles the non-streaming response from the chat handler.
- * @param {NextResponse} apiResponse - The response from the chat handler.
+ * @param {Response} apiResponse - The response from the chat handler.
  * @param {Conversation} conversation - The conversation object for logging purposes.
- * @param {NextRequest} req - The incoming Next.js API request object.
+ * @param {NextApiRequest} req - The incoming Next.js API request object.
+ * @param {NextApiResponse} res - The Next.js API response object.
  * @param {string} course_name - The name of the course associated with the conversation.
- * @returns {Promise<NextResponse>} A NextResponse object representing the JSON response.
+ * @returns {Promise<void>} A promise that resolves when the response is sent.
  */
 export async function handleNonStreamingResponse(
-  apiResponse: NextResponse,
+  apiResponse: Response,
   conversation: Conversation,
-  req: NextRequest,
+  req: NextApiRequest,
+  res: NextApiResponse,
   course_name: string,
-): Promise<NextResponse> {
+): Promise<void> {
   if (!apiResponse.body) {
     console.error('API response body is null')
-    return new NextResponse(
-      JSON.stringify({ error: 'API response body is null' }),
-      { status: 500 },
-    )
+    res.status(500).json({ error: 'API response body is null' })
+    return
   }
 
   try {
@@ -637,15 +672,13 @@ export async function handleNonStreamingResponse(
       req,
       course_name,
     )
-    return new NextResponse(JSON.stringify({ message: processedResponse }), {
-      status: 200,
-    })
+    const contexts =
+      conversation.messages[conversation.messages.length - 1]?.contexts
+    res.status(200).json({ message: processedResponse, contexts: contexts })
+    return
   } catch (error) {
     console.error('Error handling non-streaming response:', error)
-    return new NextResponse(
-      JSON.stringify({ error: 'Failed to process response' }),
-      { status: 500 },
-    )
+    res.status(500).json({ error: 'Failed to process response' })
   }
 }
 
@@ -658,12 +691,13 @@ export async function handleNonStreamingResponse(
 export async function updateConversationInDatabase(
   conversation: Conversation,
   course_name: string,
-  req: NextRequest,
+  req: NextApiRequest,
 ) {
   // Log conversation to Supabase
   try {
+    const baseUrl = getBaseUrl()
     const response = await fetch(
-      `${getBaseUrl()}/api/UIUC-api/logConversationToSupabase`,
+      `${baseUrl}/api/UIUC-api/logConversationToSupabase`,
       {
         method: 'POST',
         headers: {
@@ -684,9 +718,9 @@ export async function updateConversationInDatabase(
   }
 
   posthog.capture('stream_api_conversation_updated', {
-    distinct_id: req.headers.get('x-forwarded-for') || req.ip,
+    distinct_id: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
     conversation_id: conversation.id,
-    user_id: conversation.user_email,
+    user_id: conversation.userEmail,
   })
 }
 
@@ -708,24 +742,20 @@ export async function handleImageContent(
   course_name: string,
   updatedConversation: Conversation,
   searchQuery: string,
-  courseMetadata: CourseMetadata,
-  apiKey: string,
+  llmProviders: AllLLMProviders,
   controller: AbortController,
 ) {
-  const key =
-    courseMetadata?.openai_api_key && courseMetadata?.openai_api_key != ''
-      ? courseMetadata.openai_api_key
-      : apiKey
-  const endpoint = getBaseUrl() + '/api/chat'
-  console.log('fetching image description for message: ', message)
-
+  // TODO: bring back client-side API keys.
+  // const key =
+  //   courseMetadata?.openai_api_key && courseMetadata?.openai_api_key != ''
+  //     ? courseMetadata.openai_api_key
+  //     : apiKey
+  let imgDesc = ''
   try {
-    const imgDesc = await fetchImageDescription(
-      message,
+    imgDesc = await fetchImageDescription(
       course_name,
-      endpoint,
       updatedConversation,
-      key,
+      llmProviders,
       controller,
     )
 
@@ -738,12 +768,12 @@ export async function handleImageContent(
     )
 
     if (imgDescIndex !== -1) {
-      ;(message.content as Content[])[imgDescIndex] = {
+      ; (message.content as Content[])[imgDescIndex] = {
         type: 'text',
         text: `Image description: ${imgDesc}`,
       }
     } else {
-      ;(message.content as Content[]).push({
+      ; (message.content as Content[]).push({
         type: 'text',
         text: `Image description: ${imgDesc}`,
       })
@@ -753,5 +783,112 @@ export async function handleImageContent(
     controller.abort()
   }
   console.log('Returning search query with image description: ', searchQuery)
-  return searchQuery
+  return { searchQuery, imgDesc }
+}
+
+export const getOpenAIKey = (
+  courseMetadata: CourseMetadata,
+  userApiKey: string,
+) => {
+  const key =
+    courseMetadata?.openai_api_key && courseMetadata?.openai_api_key != ''
+      ? courseMetadata.openai_api_key
+      : userApiKey
+  return key
+}
+
+import { POST as ollamaPost } from '@/app/api/chat/ollama/route'
+import { runOllamaChat } from '~/app/utils/ollama'
+import { openAIAzureChat } from './modelProviders/OpenAIAzureChat'
+import { runAnthropicChat } from '~/app/utils/anthropic'
+
+export const routeModelRequest = async (
+  chatBody: ChatBody,
+  controller?: AbortController,
+  baseUrl?: string,
+): Promise<any> => {
+  /*  Use this to call the LLM. It will call the appropriate endpoint based on the conversation.model.
+      🧠 ADD NEW LLM PROVIDERS HERE 🧠
+  */
+  const selectedConversation = chatBody.conversation!
+
+  // Add this check at the beginning of the function
+  if (!selectedConversation.model || !selectedConversation.model.id) {
+    throw new Error('Conversation model is undefined or missing "id" property.')
+  }
+
+  posthog.capture('LLM Invoked', {
+    distinct_id: selectedConversation.userEmail
+      ? selectedConversation.userEmail
+      : 'anonymous',
+    user_id: selectedConversation.userEmail
+      ? selectedConversation.userEmail
+      : 'anonymous',
+    conversation_id: selectedConversation.id,
+    model_id: selectedConversation.model.id,
+  })
+
+  if (
+    Object.values(NCSAHostedModelID).includes(
+      selectedConversation.model.id as any,
+    )
+  ) {
+    // NCSA Hosted LLMs
+    const newChatBody = chatBody!.llmProviders!.NCSAHosted as NCSAHostedProvider
+    newChatBody.baseUrl = process.env.OLLAMA_SERVER_URL // inject proper baseURL
+
+    return await runOllamaChat(
+      chatBody.conversation!,
+      chatBody!.llmProviders!.Ollama as OllamaProvider,
+      chatBody.stream,
+    )
+  } else if (
+    Object.values(OllamaModelIDs).includes(selectedConversation.model.id as any)
+  ) {
+    // User-supplied Ollama instance
+
+    return await runOllamaChat(
+      selectedConversation,
+      chatBody!.llmProviders!.Ollama as OllamaProvider,
+      chatBody.stream,
+    )
+  } else if (
+    Object.values(AnthropicModelID).includes(
+      selectedConversation.model.id as any,
+    )
+  ) {
+    // ANTHROPIC
+    try {
+      return await runAnthropicChat(
+        selectedConversation,
+        chatBody!.llmProviders!.Anthropic as AnthropicProvider,
+        chatBody.stream,
+      )
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unknown error occurred when streaming Anthropic LLMs.',
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
+    }
+  } else if (
+    Object.values(OpenAIModelID).includes(
+      selectedConversation.model.id as any,
+    ) ||
+    Object.values(AzureModelID).includes(selectedConversation.model.id as any)
+  ) {
+    // Call the OpenAI or Azure API
+    return await openAIAzureChat(chatBody, chatBody.stream)
+  } else {
+    throw new Error(
+      `Model '${selectedConversation.model.name}' is not supported.`,
+    )
+  }
 }

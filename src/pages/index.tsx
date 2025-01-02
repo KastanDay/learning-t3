@@ -6,7 +6,6 @@ import React from 'react'
 
 import {
   // MantineProvider,
-  // Image,
   rem,
   Card,
   Text,
@@ -14,6 +13,7 @@ import {
   Badge,
   Button,
   Group,
+  Flex,
 } from '@mantine/core'
 
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
@@ -35,15 +35,14 @@ const Home: NextPage = () => {
       <LandingPageHeader />
 
       <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#0E1116]">
-        <div className="container flex flex-col items-center justify-center gap-8 px-4 py-16 ">
+        <div className="container flex w-full max-w-[95vw] flex-col items-center justify-center gap-4 px-4 py-8">
           <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-[5rem]">
             UIUC.<span className="text-[hsl(280,100%,70%)]">chat</span>
           </h1>
-          <Container
-            size="lg"
+          <div className="w-full max-w-4xl">
+            {/* size="lg"
             py="l"
-            style={{ position: 'relative', minHeight: '100%' }}
-          >
+            style={{ position: 'relative', minHeight: '100%' }} */}
             <Title
               color="#57534e"
               order={2}
@@ -70,7 +69,7 @@ const Home: NextPage = () => {
               of PDFs, PowerPoint, Word, Excel and almost anything other
               document to chat with your knowledge base.
             </Text>
-          </Container>
+          </div>
 
           <ListProjectTable />
 
@@ -82,20 +81,33 @@ const Home: NextPage = () => {
           <CourseCard />
 
           <h4 className="font-extrabold tracking-tight text-white sm:text-[3rem]">
-            <Link href="/">
+            <div>
               Some background{' '}
               <span className="text-[hsl(280,100%,70%)]">about us</span>
-            </Link>
+            </div>
           </h4>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
             <Link
               className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 text-white hover:bg-white/20"
-              href="https://github.com/UIUC-Chatbot/ai-teaching-assistant-uiuc"
+              href="https://github.com/kastanday/ai-ta-frontend"
               target="_blank"
             >
               <h3 className="text-2xl font-bold">Read the code →</h3>
               <div className="text-lg">
-                100% free<br></br>100% open source<br></br>100% awesome
+                100% free<br></br>100% open source &#40;MIT License&#41;
+                <br></br>100% awesome
+              </div>
+            </Link>
+            <Link
+              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 text-white hover:bg-white/20"
+              href="https://ai.ncsa.illinois.edu/"
+              target="_blank"
+            >
+              <h3 className="text-2xl font-bold">
+                Sponsored by the Center of AI Innovation
+              </h3>
+              <div className="text-lg">
+                Part of the National Center for Supercomputing Applications.
               </div>
             </Link>
             <Link
@@ -103,8 +115,32 @@ const Home: NextPage = () => {
               href="https://kastanday.com/"
               target="_blank"
             >
-              <h3 className="text-2xl font-bold">Bio →</h3>
-              <div className="text-lg">Made at UIUC by Kastan Day.</div>
+              <h3 className="text-2xl font-bold">Bio 👋</h3>
+              <div className="text-lg">
+                Made by Kastan Day at the University of Illinois.
+              </div>
+              {/* <div className="text-lg">Sponsored by the </div> */}
+            </Link>
+
+            <Link
+              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 text-white hover:bg-white/20"
+              href="https://status.uiuc.chat/"
+              target="_blank"
+            >
+              <h3 className="text-2xl font-bold">Status page 📊</h3>
+              {/* <div className="text-lg">Check service uptime.</div> */}
+              <Image
+                src="https://status.uiuc.chat/api/badge/1/uptime/24?label=Uptime%2024%20hours"
+                alt="Service Uptime Badge"
+                width={150}
+                height={50}
+              />
+              <Image
+                src="https://status.uiuc.chat/api/badge/1/uptime/720?label=Uptime%2030%20days"
+                alt="Service Uptime Badge"
+                width={150}
+                height={50}
+              />
             </Link>
           </div>
         </div>
@@ -268,7 +304,7 @@ function CourseCard() {
         "Using all of Clowder's documentation, this bot will answer questions and point you to the right docs and YouTube videos about Clowder.",
     },
     {
-      course_slug: 'cropwizard',
+      course_slug: 'cropwizard-1.5',
       imageSrc: '/media/hero_courses_banners/aifarms_wide_logo.png',
       title: 'Crop Wizard',
       badge: 'AIFARMS',

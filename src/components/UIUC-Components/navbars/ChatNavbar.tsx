@@ -1,61 +1,55 @@
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
-import { magicBellTheme } from '~/components/UIUC-Components/navbars/GlobalHeader'
-import {} from '@mantine/core'
+// import { magicBellTheme } from '~/components/UIUC-Components/navbars/GlobalHeader'
 import { useDisclosure } from '@mantine/hooks'
 import Image from 'next/image'
 import { useEffect, useState, useContext, useRef } from 'react'
 import {
-  createStyles,
-  // Header,
-  Flex,
-  Container,
-  // Anchor,
-  Group,
   Burger,
+  Container,
+  createStyles,
+  Flex,
+  Group,
+  Paper,
   rem,
   Transition,
-  Paper,
 } from '@mantine/core'
+import { spotlight } from '@mantine/spotlight'
 import {
   MessageChatbot,
   Folder,
   ReportAnalytics,
-  // Settings,
+  ChartDots3,
   MessageCode,
 } from 'tabler-icons-react'
-import {
-  // IconExternalLink,
-  IconRobot,
-  // IconCloudUpload,
-  // IconSettings,
-} from '@tabler/icons-react'
+import { IconFileText, IconHome, IconSettings } from '@tabler/icons-react'
 import { useRouter } from 'next/router'
 import { montserrat_heading } from 'fonts'
 import { useUser } from '@clerk/nextjs'
-// import { getCoursesByOwnerOrAdmin } from '../getAllCourseMetaData'
 import { extractEmailsFromClerk } from '~/components/UIUC-Components/clerkHelpers'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import HomeContext from '~/pages/api/home/home.context'
-import { ModelSelect } from '../../Chat/ModelSelect'
-import MagicBell, {
-  FloatingNotificationInbox,
-} from '@magicbell/magicbell-react'
+import { UserSettings } from '../../Chat/UserSettings'
+// import MagicBell, {
+//   FloatingNotificationInbox,
+// } from '@magicbell/magicbell-react'
 import { usePostHog } from 'posthog-js/react'
 
 const styles: Record<string, React.CSSProperties> = {
   logoContainerBox: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
+    // justifyContent: 'center',
+    // alignItems: 'center',
+    // overflow: 'hidden',
+    // position: 'relative',
     // height: '40%',
     height: '52px',
-    // maxWidth: typeof window !== 'undefined' && window.innerWidth > 600 ? '80%' : '100%',
-    maxWidth: '100%',
-    // paddingRight: '4px',
-    // typeof window !== 'undefined' && window.innerWidth > 900 ? '4px' : '25px',
-    minWidth: '100px',
+    maxWidth:
+      typeof window !== 'undefined' && window.innerWidth > 600 ? '80%' : '100%',
+    // maxWidth: '100%',
+    // paddingRight:
+    //   typeof window !== 'undefined' && window.innerWidth > 600 ? '10px' : '2px',
+    paddingLeft:
+      typeof window !== 'undefined' && window.innerWidth > 600 ? '25px' : '5px',
   },
   thumbnailImage: {
     objectFit: 'cover',
@@ -76,10 +70,11 @@ const useStyles = createStyles((theme) => ({
     justifyContent: 'space-between',
   },
   links: {
-    padding: 'theme.spacing.sm, 5px, 5px',
+    // padding: 'theme.spacing.sm, 5px, 5px',
+    padding: 'theme.spacing.lg, 1em, 1em',
     display: 'flex',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     [theme.fn.smallerThan(1118)]: {
       display: 'none',
     },
@@ -87,7 +82,8 @@ const useStyles = createStyles((theme) => ({
   link: {
     // textTransform: 'uppercase',
     fontSize: rem(12),
-    padding: `${theme.spacing.sm} ${theme.spacing.sm}`,
+    textAlign: 'center',
+    padding: `3px ${theme.spacing.sm}`,
     margin: '0.2rem',
     fontWeight: 700,
     transition:
@@ -109,25 +105,29 @@ const useStyles = createStyles((theme) => ({
     },
     [theme.fn.smallerThan(1118)]: {
       display: 'list-item',
-      textAlign: 'right',
+      textAlign: 'center',
       borderRadius: 0,
       padding: theme.spacing.sm,
+      margin: '0.2rem 0 0.2rem 0',
     },
   },
   burger: {
     [theme.fn.largerThan(1118)]: {
       display: 'none',
+      marginRight: '8px',
     },
-    marginRight: '14px',
+    marginRight: '3px',
+    marginLeft: '0px',
   },
   dropdown: {
     position: 'absolute',
     top: HEADER_HEIGHT,
-    left: '71%',
-    right: '10%',
+    // left: '71%',
+    right: '20px',
     zIndex: 10,
     borderRadius: '10px',
     overflow: 'hidden',
+    width: '200px',
     [theme.fn.largerThan(1118)]: {
       display: 'none',
     },
@@ -146,15 +146,15 @@ const useStyles = createStyles((theme) => ({
   },
 }))
 
-const ChatNavbar = ({
-  course_name = '',
-  bannerUrl = '',
-  isgpt4 = true,
-  className = '',
-}) => {
+interface ChatNavbarProps {
+  bannerUrl?: string
+  isgpt4?: boolean
+}
+
+const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
   const { classes, theme } = useStyles()
   const router = useRouter()
-  const [activeLink, setActiveLink] = useState(router.asPath)
+  const [activeLink, setActiveLink] = useState<null | string>(null)
   const [opened, { toggle }] = useDisclosure(false)
   const [show, setShow] = useState(true)
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(false)
@@ -165,199 +165,185 @@ const ChatNavbar = ({
     dispatch: homeDispatch,
   } = useContext(HomeContext)
 
-  // const [modelName, setModelName] = useState(selectedConversation?.model.name)
-
-  // useEffect(() => {
-  //   console.log("&&&&&&&& IN ChatNavbar useEffect, selectedConversation is ", selectedConversation)
-  //   console.log("&&&&&&&& IN ChatNavbar useEffect, selectedConversation?.model.name is ", selectedConversation?.model.name)
-  //   setModelName(selectedConversation?.model.name)
-  // }, [selectedConversation])
-
-  const modelSettingsContainer = useRef<HTMLDivElement | null>(null)
   const topBarRef = useRef<HTMLDivElement | null>(null)
   const getCurrentCourseName = () => {
     return router.asPath.split('/')[1]
   }
 
   const [userEmail, setUserEmail] = useState('no_email')
+
+  useEffect(() => {
+    if (!router.isReady) return
+    setActiveLink(router.asPath.split('?')[0]!)
+  }, [router.asPath])
+
   useEffect(() => {
     const fetchCourses = async () => {
       if (clerk_user.isLoaded && clerk_user.isSignedIn) {
-        const emails = extractEmailsFromClerk(clerk_user.user)
-        const currUserEmail = emails[0]
-        setUserEmail(currUserEmail || 'no_email')
-        if (!currUserEmail) {
-          throw new Error('No email found for the user')
-        }
+        const currUserEmails = extractEmailsFromClerk(clerk_user.user)
         // Posthog identify
         posthog?.identify(clerk_user.user.id, {
-          email: currUserEmail || 'no_email',
+          email: currUserEmails[0] || 'no_email',
         })
+        setUserEmail(currUserEmails[0] || 'no_email')
 
         const response = await fetch(
-          `/api/UIUC-api/getAllCourseMetadata?currUserEmail=${currUserEmail}`,
+          `/api/UIUC-api/getCourseMetadata?course_name=${getCurrentCourseName()}`,
         )
-        const rawData = await response.json()
-        if (rawData) {
-          const currentCourseName = getCurrentCourseName()
-          if (currentCourseName) {
-            const courseData = rawData.find(
-              (course: { [key: string]: CourseMetadata }) =>
-                Object.keys(course)[0] === currentCourseName,
-            )
-            if (courseData) {
-              const courseMetadata = courseData[currentCourseName]
-              const isAdmin =
-                courseMetadata.course_owner === currUserEmail ||
-                (courseMetadata.course_admins &&
-                  courseMetadata.course_admins.includes(currUserEmail))
-              setIsAdminOrOwner(isAdmin)
-            } else {
-              setIsAdminOrOwner(false)
-            }
-          }
+        const courseMetadata = await response.json().then((data) => {
+          return data['course_metadata']
+        })
+
+        if (
+          currUserEmails.includes(courseMetadata.course_owner) ||
+          currUserEmails.some((email) =>
+            courseMetadata.course_admins?.includes(email),
+          )
+        ) {
+          setIsAdminOrOwner(true)
+        } else {
+          setIsAdminOrOwner(false)
         }
       }
     }
     fetchCourses()
   }, [clerk_user.isLoaded, clerk_user.isSignedIn])
 
-  const handleLinkClick = (path: string) => {
-    setActiveLink(path)
-    toggle()
-  }
-
-  const items = isAdminOrOwner
-    ? [
-        {
-          name: (
-            <span
-              className={`${montserrat_heading.variable} font-montserratHeading`}
-            >
-              Chat
-            </span>
-          ),
-          icon: <MessageChatIcon />,
-          link: `/${getCurrentCourseName()}/chat`,
-        },
-        {
-          name: (
-            <span
-              className={`${montserrat_heading.variable} font-montserratHeading`}
-            >
-              Materials
-            </span>
-          ),
-          icon: <FolderIcon />,
-          link: `/${getCurrentCourseName()}/materials`,
-        },
-        {
-          name: (
-            <span
-              className={`${montserrat_heading.variable} font-montserratHeading`}
-            >
-              Analysis
-            </span>
-          ),
-          icon: <ReportIcon />,
-          link: `/${getCurrentCourseName()}/query-analysis`,
-        },
-        {
-          name: (
-            <span
-              className={`${montserrat_heading.variable} font-montserratHeading`}
-            >
-              Prompting
-            </span>
-          ),
-          icon: <SettingIcon />,
-          link: `/${getCurrentCourseName()}/prompt`,
-        },
-      ]
-    : []
-
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      event.target instanceof Node &&
-      topBarRef.current &&
-      topBarRef.current.contains(event.target)
-    ) {
-      // Do nothing, the click on button + and click outside should cancel out
-    } else if (
-      modelSettingsContainer.current &&
-      topBarRef.current &&
-      event.target instanceof Node &&
-      !modelSettingsContainer.current.contains(event.target)
-    ) {
-      homeDispatch({ field: 'showModelSettings', value: false })
-    }
-  }
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [modelSettingsContainer])
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [topBarRef])
+  const items = [
+    ...(spotlight
+      ? [
+          // {
+          //   name: (
+          //     <span
+          //       className={`${montserrat_heading.variable} font-montserratHeading`}
+          //     >
+          //       Groups/Tools
+          //     </span>
+          //   ),
+          //   icon: <SpotlightIcon />,
+          //   action: () => spotlight.open(), // This opens the Spotlight
+          // },
+        ]
+      : []),
+    ...(isAdminOrOwner
+      ? [
+          {
+            name: (
+              <span
+                className={`${montserrat_heading.variable} font-montserratHeading`}
+              >
+                Chat
+              </span>
+            ),
+            icon: <MessageChatIcon />,
+            link: `/${getCurrentCourseName()}/chat`,
+          },
+          {
+            name: (
+              <span
+                className={`${montserrat_heading.variable} font-montserratHeading`}
+              >
+                Admin Dashboard
+              </span>
+            ),
+            icon: <FolderIcon />,
+            link: `/${getCurrentCourseName()}/dashboard`,
+          },
+          // {
+          //   name: (
+          //     <span
+          //       className={`${montserrat_heading.variable} font-montserratHeading`}
+          //     >
+          //       Analysis
+          //     </span>
+          //   ),
+          //   icon: <ReportIcon />,
+          //   link: `/${getCurrentCourseName()}/query-analysis`,
+          // },
+          // {
+          //   name: (
+          //     <span
+          //       className={`${montserrat_heading.variable} font-montserratHeading`}
+          //     >
+          //       Prompting
+          //     </span>
+          //   ),
+          //   icon: <SettingIcon />,
+          //   link: `/${getCurrentCourseName()}/prompt`,
+          // },
+        ]
+      : []),
+  ]
 
   return (
     <div
       className={`${isgpt4 ? 'bg-[#15162c]' : 'bg-[#2e026d]'} -mr-5 pb-16 pl-5`}
-      style={{ display: show ? 'block' : 'none', height: '40%' }}
+      style={{ display: show ? 'block' : 'none' }}
+      // style={{ display: show ? 'flex' : 'none', flexDirection: 'row', height: '40%', alignItems: 'center' }}
     >
       <div
-        className="mt-4 w-full max-w-[95%]"
-        style={{ height: '50px', paddingTop: 'Opx' }}
+        // className="mt-4"
+        style={{ paddingTop: 'Opx', maxWidth: '95vw', marginRight: '45px' }}
       >
         {/* <div > */}
         {/* <Flex style={{ flexDirection: 'row' }} className="navbar rounded-badge h-24 bg-[#15162c] shadow-lg shadow-purple-800"> */}
+
         <Flex
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            height: '30px',
-          }}
-          className="navbar rounded-badge h-24 bg-[#15162c] shadow-lg shadow-purple-800"
+          justify="flex-start"
+          direction="row"
+          styles={{ height: '10px', flexWrap: 'nowrap', gap: '0rem' }}
+          className="navbar rounded-badge bg-[#15162c] shadow-lg shadow-purple-800"
         >
-          <div style={{ justifyContent: 'flex-start' }}>
+          {/* <div> */}
+          {/* <div
+            style={{
+              ...styles.logoContainerBox,
+              // display: 'flex',
+              // alignItems: 'center',
+              // justifyContent: 'flex-start',
+            }}
+          > */}
+          <Link href="/" style={{ flex: 'none', flexWrap: 'nowrap' }}>
+            <h2 className="cursor-pointer font-extrabold tracking-tight text-white sm:ms-3 sm:text-[2rem] sm:text-[2rem] md:text-3xl">
+              UIUC.<span className="text-[hsl(280,100%,70%)]">chat</span>
+            </h2>
+          </Link>
+
+          {bannerUrl ? (
+            <div style={{ ...styles.logoContainerBox, flex: '1' }}>
+              <Image
+                src={bannerUrl}
+                style={{ ...styles.thumbnailImage }}
+                width={2000}
+                height={2000}
+                alt="The course creator uploaded a logo for this chatbot."
+                aria-label="The course creator uploaded a logo for this chatbot."
+                onError={(e) => (e.currentTarget.style.display = 'none')} // display nothing if image fails
+              />
+            </div>
+          ) : (
+            // Placeholder div
             <div
               style={{
                 ...styles.logoContainerBox,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
+                flex: '1',
+                visibility: 'hidden',
               }}
-            >
-              <Link href="/">
-                <h2 className="ms-8 cursor-pointer text-3xl font-extrabold tracking-tight text-white sm:text-[2rem] ">
-                  UIUC.<span className="text-[hsl(280,100%,70%)]">chat</span>
-                </h2>
-              </Link>
+            ></div>
+          )}
+          {/* </Flex> */}
+          {/* </div> */}
+          {/* </div> */}
 
-              {bannerUrl && (
-                <div
-                  style={{ ...styles.logoContainerBox, paddingLeft: '25px' }}
-                >
-                  <Image
-                    src={bannerUrl}
-                    style={{ ...styles.thumbnailImage }}
-                    width={2000}
-                    height={2000}
-                    alt="The course creator uploaded a logo for this chatbot."
-                    aria-label="The course creator uploaded a logo for this chatbot."
-                    onError={(e) => (e.currentTarget.style.display = 'none')} // display nothing if image fails
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {/* <div style={{ display: 'flex', justifyContent: 'flex-end' }}> */}
+          {/* <Flex direction='row' justify='flex-end' styles={{ flex: 1 }}> */}
+          <Group
+            position="right"
+            styles={{ marginLeft: 'auto', flexWrap: 'nowrap' }}
+            spacing="0px"
+            noWrap
+          >
+            {/* TODO: .mantine-kivjf7 {gap: 0rem} */}
             {/* This is the hamburger menu / dropdown */}
             <Transition
               transition="pop-top-right"
@@ -368,28 +354,85 @@ const ChatNavbar = ({
                 <Paper
                   className={classes.dropdown}
                   withBorder
-                  style={{ ...styles, transform: 'translateY(26px)' }}
+                  style={{
+                    ...styles,
+                    transform: 'translateY(26px)',
+                    minWidth: '120px',
+                  }}
                 >
-                  {items.map((item, index) => (
-                    <Link
-                      key={index}
-                      href={item.link}
-                      onClick={() => handleLinkClick(item.link)}
-                      data-active={activeLink === item.link}
-                      className={classes.link}
-                    >
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'left',
-                          justifyContent: 'flex-start',
-                        }}
-                      >
-                        {item.icon}
-                        {item.name}
-                      </span>
-                    </Link>
-                  ))}
+                  {items.map((item, index) => {
+                    if (item.link) {
+                      return (
+                        <Link
+                          key={index}
+                          href={item.link}
+                          onClick={() => {
+                            // setActiveLink(router.asPath.split('?')[0]!)
+                            toggle()
+                          }}
+                          data-active={activeLink === item.link}
+                          className={classes.link}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {item.icon}
+                          <span
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-center',
+                              padding: '0px',
+                              whiteSpace: 'nowrap',
+                              width: '100%',
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        </Link>
+                      )
+                    }
+                    // else {
+                    //   return (
+                    //     <button
+                    //       key={index}
+                    //       onClick={() => {
+                    //         if (item.action) {
+                    //           item.action()
+                    //         }
+                    //         toggle()
+                    //       }}
+                    //       data-active={activeLink === item.link}
+                    //       className={classes.link}
+                    //       style={{ width: '100%' }}
+                    //     >
+                    //       <div
+                    //         style={{
+                    //           display: 'flex',
+                    //           alignItems: 'center',
+                    //         }}
+                    //       >
+                    //         {item.icon}
+                    //         <span
+                    //           style={{
+                    //             display: 'flex',
+                    //             alignItems: 'center',
+                    //             justifyContent: 'flex-center',
+                    //             padding: '0px',
+                    //             whiteSpace: 'nowrap',
+                    //             width: '100%',
+                    //           }}
+                    //         >
+                    //           {item.name}
+                    //         </span>
+                    //       </div>
+                    //     </button>
+                    //   )
+                    // }
+                  })}
                 </Paper>
               )}
             </Transition>
@@ -400,38 +443,92 @@ const ChatNavbar = ({
               style={{ padding: 0, margin: 0 }}
             >
               <div className={classes.links}>
-                {items.map((item, index) => (
-                  <Link
-                    key={index}
-                    href={item.link}
-                    onClick={() => handleLinkClick(item.link)}
-                    data-active={activeLink === item.link}
-                    className={classes.link}
-                  >
-                    <span
-                      style={{
-                        display: 'flex',
-                        alignItems: 'left',
-                        justifyContent: 'flex-start',
-                        padding: '0px',
-                      }}
-                    >
-                      {item.icon}
-                      {item.name}
-                    </span>
-                  </Link>
-                ))}
+                {items.map((item, index) => {
+                  if (item.link) {
+                    return (
+                      <Link
+                        key={index}
+                        href={item.link}
+                        data-active={activeLink === item.link}
+                        className={classes.link}
+                        style={{ padding: '3px 12px' }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            width: '100%',
+                          }}
+                        >
+                          {item.icon}
+                          <span
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-center',
+                              padding: '0px',
+                              height: '40px',
+                              whiteSpace: 'nowrap',
+                              marginLeft: '5px',
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        </div>
+                      </Link>
+                    )
+                  }
+                  // else {
+                  //   return (
+                  //     <button
+                  //       key={index}
+                  //       onClick={() => {
+                  //         if (item.action) {
+                  //           item.action()
+                  //         }
+                  //       }}
+                  //       data-active={activeLink === item.link}
+                  //       className={classes.link}
+                  //       style={{ padding: '3px 12px' }}
+                  //     >
+                  //       <div
+                  //         style={{
+                  //           display: 'flex',
+                  //           alignItems: 'center',
+                  //           width: '100%',
+                  //         }}
+                  //       >
+                  //         {item.icon}
+                  //         <span
+                  //           style={{
+                  //             display: 'flex',
+                  //             alignItems: 'center',
+                  //             justifyContent: 'flex-center',
+                  //             padding: '0px',
+                  //             height: '40px',
+                  //             whiteSpace: 'nowrap',
+                  //             marginLeft: '5px',
+                  //           }}
+                  //         >
+                  //           {item.name}
+                  //         </span>
+                  //       </div>
+                  //     </button>
+                  //   )
+                  // }
+                })}
               </div>
               <div style={{ display: 'block' }}>
                 <button
                   className={`${classes.link}`}
-                  style={{ padding: '3px 12px', minWidth: '120px' }}
+                  style={{ padding: '0px 10px', minWidth: '120px' }}
                   onClick={() => {
                     homeDispatch({
                       field: 'showModelSettings',
                       value: !showModelSettings,
                     })
                   }}
+                  aria-label={`Open or close show model settings.`}
                 >
                   <div
                     ref={topBarRef}
@@ -441,9 +538,14 @@ const ChatNavbar = ({
                       width: '100%',
                     }}
                   >
-                    <IconRobot
+                    <IconSettings
                       size={24}
-                      style={{ position: 'relative', top: '-2px' }}
+                      style={{
+                        position: 'relative',
+                        top: '-2px',
+                        paddingLeft: '-3px',
+                        marginRight: '-8px',
+                      }}
                     />
                     <span
                       className="home-header_text-underline"
@@ -457,11 +559,12 @@ const ChatNavbar = ({
                       }}
                     >
                       <span
-                        style={{ marginLeft: '5px', whiteSpace: 'nowrap' }}
+                        style={{ whiteSpace: 'nowrap' }}
                         className={`${montserrat_heading.variable} font-montserratHeading`}
                       >
                         {/* Model: {modelName} */}
-                        Model: {selectedConversation?.model.name}
+                        {/* {selectedConversation?.model.name} */}
+                        Settings
                       </span>
                     </span>
                   </div>
@@ -475,12 +578,9 @@ const ChatNavbar = ({
                   top: '75px',
                 }}
               >
-                {showModelSettings && (
-                  <ModelSelect
-                    ref={modelSettingsContainer}
-                    style={{ width: '100%', backgroundColor: '#1d1f33' }}
-                  />
-                )}
+                <UserSettings
+                // ref={modelSettingsContainer}
+                />
               </div>
             </Container>
 
@@ -510,8 +610,8 @@ const ChatNavbar = ({
                   {/* <div /> */}
                   {/* <div style={{ paddingLeft: '10px', paddingRight: '8px' }} /> */}
 
-                  {/* render the MagicBell untill userEmail is valid otherwise there is a warning message of userEmail */}
-                  {userEmail !== 'no_email' && (
+                  {/* render the MagicBell until userEmail is valid otherwise there is a warning message of userEmail */}
+                  {/* {userEmail !== 'no_email' && (
                     <MagicBell
                       apiKey={process.env.NEXT_PUBLIC_MAGIC_BELL_API as string}
                       userEmail={userEmail}
@@ -530,7 +630,7 @@ const ChatNavbar = ({
                         />
                       )}
                     </MagicBell>
-                  )}
+                  )} */}
                   <UserButton afterSignOutUrl="/" />
                 </Group>
               </SignedIn>
@@ -550,7 +650,9 @@ const ChatNavbar = ({
                 </SignInButton>
               </SignedOut>
             </div>
-          </div>
+            {/* </div> */}
+            {/* </Flex> */}
+          </Group>
         </Flex>
         {/* </div> */}
       </div>
@@ -558,6 +660,17 @@ const ChatNavbar = ({
   )
 }
 export default ChatNavbar
+
+export function SpotlightIcon() {
+  return (
+    <IconFileText
+      size={20}
+      strokeWidth={2}
+      // color={'white'}
+      style={{ marginRight: '4px', marginLeft: '4px' }}
+    />
+  )
+}
 
 export function MessageChatIcon() {
   return (
@@ -572,7 +685,7 @@ export function MessageChatIcon() {
 
 export function FolderIcon() {
   return (
-    <Folder
+    <IconHome
       size={20}
       strokeWidth={2}
       // color={'white'}
@@ -595,6 +708,17 @@ export function ReportIcon() {
 export function SettingIcon() {
   return (
     <MessageCode
+      size={20}
+      strokeWidth={2}
+      // color={'white'}
+      style={{ marginRight: '4px', marginLeft: '4px' }}
+    />
+  )
+}
+
+export function ChartDots3Icon() {
+  return (
+    <ChartDots3
       size={20}
       strokeWidth={2}
       // color={'white'}

@@ -1,9 +1,13 @@
-import { Conversation, Message } from '@/types/chat'
+import { Action, Conversation, Message, UIUCTool } from '@/types/chat'
 import { ErrorMessage } from '@/types/error'
-import { FolderInterface } from '@/types/folder'
-import { OpenAIModel, OpenAIModelID } from '@/types/openai'
+import { FolderInterface, FolderWithConversation } from '@/types/folder'
+import { OpenAIModelID } from '~/utils/modelProviders/types/openai'
 import { PluginKey } from '@/types/plugin'
 import { Prompt } from '@/types/prompt'
+import {
+  AnySupportedModel,
+  AllLLMProviders,
+} from '~/utils/modelProviders/LLMProvider'
 
 export interface HomeInitialState {
   apiKey: string
@@ -12,9 +16,9 @@ export interface HomeInitialState {
   lightMode: 'light' | 'dark'
   messageIsStreaming: boolean
   modelError: ErrorMessage | null
-  models: OpenAIModel[]
-  selectedModel: OpenAIModel | null
-  folders: FolderInterface[]
+  llmProviders: AllLLMProviders
+  selectedModel: AnySupportedModel | null
+  folders: FolderWithConversation[]
   conversations: Conversation[]
   selectedConversation: Conversation | undefined
   currentMessage: Message | undefined
@@ -31,6 +35,18 @@ export interface HomeInitialState {
   cooldown: number
   showModelSettings: boolean
   isImg2TextLoading: boolean
+  isRouting: boolean | undefined
+  isRunningTool: boolean | undefined
+  isRetrievalLoading: boolean | undefined
+  isQueryRewriting: boolean | undefined
+  wasQueryRewritten: boolean | undefined
+  queryRewriteText: string | undefined
+  documentGroups: Action[]
+  tools: UIUCTool[]
+  webLLMModelIdLoading: {
+    id: string | undefined
+    isLoading: boolean | undefined
+  }
 }
 
 export const initialState: HomeInitialState = {
@@ -40,7 +56,7 @@ export const initialState: HomeInitialState = {
   lightMode: 'dark',
   messageIsStreaming: false,
   modelError: null,
-  models: [],
+  llmProviders: {} as AllLLMProviders,
   selectedModel: null,
   folders: [],
   conversations: [],
@@ -58,5 +74,14 @@ export const initialState: HomeInitialState = {
   serverSidePluginKeysSet: false,
   cooldown: 0,
   showModelSettings: false,
+  isRouting: undefined,
+  isRunningTool: undefined,
+  isRetrievalLoading: undefined,
+  isQueryRewriting: undefined,
+  wasQueryRewritten: undefined,
+  queryRewriteText: undefined,
   isImg2TextLoading: false,
+  documentGroups: [],
+  tools: [],
+  webLLMModelIdLoading: { id: undefined, isLoading: undefined },
 }
