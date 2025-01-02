@@ -7,7 +7,7 @@ import type {
 } from 'openai/resources/chat/completions'
 
 import { Conversation } from '~/types/chat'
-import { decrypt, decryptKeyIfNeeded, isEncrypted } from '~/utils/crypto'
+import { decryptKeyIfNeeded } from '~/utils/crypto'
 
 export const runtime = 'edge'
 
@@ -25,8 +25,6 @@ const conversationToMessages = (
     }
     transformedData.push(simpleMessage)
   })
-
-  // console.log('Transformed messages array: ', transformedData)
 
   return transformedData
 }
