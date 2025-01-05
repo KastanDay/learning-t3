@@ -235,29 +235,34 @@ export default function GitHubIngestForm({
       )
       const data = await response.json();
       setUploadFiles((prev) => {
-        return prev.map((file) => {
-          if (file.status === 'uploading') {
-            const isIngesting = data?.documents?.some(
-              (doc: { url: string }) =>
-                doc.url === file.name,
-            )
-            if (isIngesting) {
-              return { ...file, status: 'ingesting' as const }
-            }
-          }
-          else if (file.status === 'ingesting') {
-            const isStillIngesting = data?.documents?.some(
-              (doc: { url: string }) =>
-                doc.url === file.name,
-            )
-            if (!isStillIngesting) {
+        const currentBaseUrls = new Set(prev.map((file) => file.name));
 
-              return { ...file, status: 'complete' as const }
-            }
+        // Add new files from the fetched data if they have the same base_url as any existing file's base_url
+        const newFiles = data?.documents
+          ?.filter((doc: { base_url: string }) =>
+            !currentBaseUrls.has(doc.base_url) &&
+            prev.some((file) => file.name === doc.base_url)
+          )
+          .map((doc: { base_url: string, url: string }) => ({
+            name: doc.url,
+            status: 'ingesting' as const,
+          })) || [];
+
+        // Update existing files and add new files
+        const updatedFiles = prev.map((file) => {
+          const isIngesting = data?.documents?.some(
+            (doc: { url: string }) => doc.url === file.name
+          );
+          if (file.status === 'uploading' && isIngesting) {
+            return { ...file, status: 'ingesting' as const };
+          } else if (file.status === 'ingesting' && !isIngesting) {
+            return { ...file, status: 'complete' as const };
           }
-          return file
-        })
-      })
+          return file;
+        });
+
+        return [...updatedFiles, ...newFiles];
+      });
     }
     const interval = setInterval(checkIngestStatus, 3000)
     return () => {
