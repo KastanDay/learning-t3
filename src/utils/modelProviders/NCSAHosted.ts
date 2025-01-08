@@ -20,6 +20,7 @@ export enum NCSAHostedModelID {
   LLAMA31_latest = 'llama3.1:latest', // maps to LLAMA31_8b
   LLAMA31_70b = 'llama3.1:70b',
   LLAMA31_405b = 'llama3.1:405b',
+  LLAMA32_vision_11b_instruct_fp16 = 'llama3.2-vision:11b-instruct-fp16',
 }
 
 export const NCSAHostedModels: Record<NCSAHostedModelID, OllamaModel> = {
@@ -65,6 +66,13 @@ export const NCSAHostedModels: Record<NCSAHostedModelID, OllamaModel> = {
     tokenLimit: 128000,
     enabled: true,
   },
+  [NCSAHostedModelID.LLAMA32_vision_11b_instruct_fp16]: {
+    id: NCSAHostedModelID.LLAMA32_vision_11b_instruct_fp16,
+    name: 'Llama 3.2 Vision 11b (FP16)',
+    parameterSize: '11b',
+    tokenLimit: 128000,
+    enabled: true,
+  },
 }
 
 export const getNCSAHostedModels = async (
@@ -84,7 +92,9 @@ export const getNCSAHostedModels = async (
     }
 
     // ✅ HARD CODE ONLY ONE MODEL 
-    const ollamaModels = [NCSAHostedModels['llama3.1:8b-instruct-fp16']]
+    // const ollamaModels = [NCSAHostedModels['llama3.1:8b-instruct-fp16']]
+    const ollamaModels = [NCSAHostedModels['llama3.2-vision:11b-instruct-fp16']]
+
 
     // ❌ DYNAMICALLY show all HOT AND LOADED models
     // const data = await response.json()

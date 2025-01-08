@@ -19,6 +19,7 @@ export enum OllamaModelIDs {
   LLAMA31_405b = 'llama3.1:405b',
   LLAMA31_8b_instruct_fp16 = 'llama3.1:8b-instruct-fp16',
   LLAMA31_70b_instruct_fp16 = 'llama3.1:70b-instruct-fp16',
+  LLAMA32_vision_11b_instruct_fp16 = 'llama3.2-vision:11b-instruct-fp16',
 }
 
 export const OllamaModels: Record<OllamaModelIDs, OllamaModel> = {
@@ -61,6 +62,13 @@ export const OllamaModels: Record<OllamaModelIDs, OllamaModel> = {
     id: OllamaModelIDs.LLAMA31_405b,
     name: 'Llama 3.1 405b',
     parameterSize: '405b',
+    tokenLimit: 128000,
+    enabled: true,
+  },
+  [OllamaModelIDs.LLAMA32_vision_11b_instruct_fp16]: {
+    id: OllamaModelIDs.LLAMA32_vision_11b_instruct_fp16,
+    name: 'Llama 3.2 Vision 11b (FP16)',
+    parameterSize: '11b',
     tokenLimit: 128000,
     enabled: true,
   },

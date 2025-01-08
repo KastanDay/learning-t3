@@ -1,4 +1,4 @@
-import { OllamaModel, OllamaModels } from '~/utils/modelProviders/ollama'
+import { OllamaModel, OllamaModelIDs, OllamaModels } from '~/utils/modelProviders/ollama'
 import { WebllmModel } from '~/utils/modelProviders/WebLLM'
 import {
   OpenAIModel,
@@ -36,7 +36,7 @@ export type AnySupportedModel =
 
 // Add other vision capable models as needed
 export const VisionCapableModels: Set<
-  OpenAIModelID | AzureModelID | AnthropicModelID
+  OpenAIModelID | AzureModelID | AnthropicModelID | OllamaModelIDs
 > = new Set([
   OpenAIModelID.GPT_4_Turbo,
   OpenAIModelID.GPT_4o,
@@ -47,6 +47,8 @@ export const VisionCapableModels: Set<
   AzureModelID.GPT_4o_mini,
   // claude-3.5....
   AnthropicModelID.Claude_3_5_Sonnet,
+
+  OllamaModelIDs.LLAMA32_vision_11b_instruct_fp16
 ])
 
 export const AllSupportedModels: Set<GenericSupportedModel> = new Set([
