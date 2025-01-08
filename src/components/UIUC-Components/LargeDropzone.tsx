@@ -244,11 +244,16 @@ export function LargeDropzone({
   // Add useEffect to check ingest status
   useEffect(() => {
     const checkIngestStatus = async () => {
+
+      console.debug('Checking for ingest in progress...')
       const response = await fetch(
         `/api/materialsTable/docsInProgress?course_name=${courseName}`,
       )
-      const data = await response.json();
-      console.log('docs in progress', data);
+      const data = await response.json()
+      if (data.documents.length > 0) {
+        console.debug('ingest is currently active: ', data.documents)
+      }
+
       setUploadFiles((prev) => {
         return prev.map((file) => {
           if (file.status === 'uploading') {
