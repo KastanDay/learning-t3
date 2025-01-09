@@ -134,7 +134,9 @@ export async function fetchPresignedUrl(
  */
 export async function fetchCourseMetadata(course_name: string): Promise<any> {
   try {
+    console.log("Vercel URL: ", process.env.VERCEL_URL)
     const endpoint = `${getBaseUrl()}/api/UIUC-api/getCourseMetadata?course_name=${course_name}`
+    console.log("Fetching getCourseMetadata - unauthorized error after this", endpoint)
     const response = await fetch(endpoint)
 
     if (!response.ok) {

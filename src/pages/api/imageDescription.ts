@@ -3,6 +3,8 @@ import { ChatBody, Content, ImageBody, OpenAIChatMessage } from '~/types/chat'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 
 import { OpenAIError, OpenAIStream } from '@/utils/server'
+import { OpenAIModelID, OpenAIModels } from '~/utils/modelProviders/types/openai'
+import { ProviderNames } from '~/utils/modelProviders/LLMProvider'
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
@@ -27,8 +29,26 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       { role: 'user', content: [...contentArray] },
     ]
 
+    console.log("model,", model)
+    console.log("llmProviders.openai", llmProviders.OpenAI)
+    console.log("llmProviders.azure", llmProviders.Azure)
+
+    if (!llmProviders?.OpenAI?.apiKey && !llmProviders?.Azure?.apiKey) {
+      // If they don't have any API key, fallback to using Vlad's
+      if (llmProviders?.OpenAI) {
+        llmProviders.OpenAI.apiKey = process.env.VLADS_OPENAI_KEY
+      } else {
+        llmProviders.OpenAI = {
+          provider: ProviderNames.OpenAI,
+          enabled: true,
+          apiKey: process.env.VLADS_OPENAI_KEY,
+        }
+      }
+    }
+
+
     const response = await OpenAIStream(
-      model,
+      OpenAIModels['gpt-4o-mini'],
       systemPrompt,
       0.1,
       llmProviders,

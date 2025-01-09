@@ -110,6 +110,8 @@ export default async function handler(
           console.warn(`Unhandled provider: ${providerName}`)
       }
     }
+    console.log("All models", allLLMProviders)
+    console.log("NCSA HOsted LLMs", allLLMProviders.NCSAHosted?.models)
 
     return res.status(200).json(allLLMProviders as AllLLMProviders)
   } catch (error) {
