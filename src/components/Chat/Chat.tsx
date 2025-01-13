@@ -955,8 +955,8 @@ export const Chat = memo(
               const fromSendToLLMResponse = performance.now() - startOfHandleSend
               // LLM Starts responding 
               posthog.capture('ttft', {
-                course_name: chatBody.course_name,
-                model: chatBody.model,
+                course_name: finalChatBody.course_name,
+                model: finalChatBody.model,
                 llmRequestToFirstToken: Math.round(ttft), // Round to whole number of milliseconds
                 fromSendToLLMResponse: Math.round(fromSendToLLMResponse)
               })
