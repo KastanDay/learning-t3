@@ -18,6 +18,7 @@ export interface Conversation {
   messages: Message[]
   model: AnySupportedModel
   prompt: string
+  summary?: string // running summary of the last user query and assistant answer.
   temperature: number
   folderId: string | null
   userEmail?: string
@@ -78,7 +79,7 @@ export interface ToolOutput {
   data?: Record<string, unknown> // For any other structured data
 }
 
-// tool_image_url is for images returned by tools
+// tool_image_url is for images returned by tools. summary is for the conversation summary.
 export type MessageType = 'text' | 'image_url' | 'tool_image_url' | 'summary'
 
 export interface Content {

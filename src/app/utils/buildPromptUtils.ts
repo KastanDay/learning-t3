@@ -43,7 +43,9 @@ export const buildPrompt = async ({
   
     Priorities for building prompt w/ limited window:
     1. ✅ Most recent user text input & images/img-description (depending on model support for images)
-    1.5. ❌ Last 1 or 2 conversation history. At least the user message and the AI response. Key for follow-up questions.
+    1.5. LLM memory - Key for follow-up questions: 
+      1.5.1. Conversation summary - running summary of the last user query and assistant answer. 
+      1.5.2. Last 1 or 2 conversation history. At least the user message and the AI response.
     2. ✅ Image description
     3. ✅ Tool result
     4. ✅ query_topContext (if documents are retrieved)
@@ -72,31 +74,46 @@ export const buildPrompt = async ({
 
     // Initialize an array to collect sections of the user prompt
     const userPromptSections: string[] = []
-    const lastUserTextInput = await _getLastUserTextInput({ conversation })
     const finalSystemPrompt =
-      'You are a helpful assistant that summarizes content. Summarize the below content within 3 sentences'
-    // P1: Most recent user text input
+      'You are a helpful assistant that summarizes content. Summarize the below content in 3 sentences'
+    // P1 : get the previous conversation summary, if it exists
+    if (conversation.summary) {
+      const previousConversationSummary = `\n<Previous Conversation Summary>\n${conversation.summary}\n</Previous Conversation Summary>`
+      userPromptSections.push(previousConversationSummary)
+    }
+    // P2 : get the most recent user text input
+    const lastUserTextInput = await _getLastUserTextInput({ conversation })
     const userQuery = `\n<User Query>\n${lastUserTextInput}\n</User Query>`
     if (encoding) {
       remainingTokenBudget -= encoding.encode(userQuery).length
     }
     userPromptSections.push(userQuery)
-    const lastAssistantMessage =
+    // P3 : get the last assistant message
+    const lastAssistantMessage: string | Content[] =
       conversation?.messages
         .filter((msg) => msg.role === 'assistant')
         .slice(-1)[0]?.content || ''
 
-    // Remove "References:" section from assistant message if it exists
+    // get the last message text
     let cleanedAssistantMessage = ''
-    if (typeof lastAssistantMessage === 'string') {
-      const referencesIndex = lastAssistantMessage.search(
-        /References:|Relevant Sources:/,
-      ) // TODO: make this search string more robust
-      cleanedAssistantMessage =
-        referencesIndex !== -1
-          ? lastAssistantMessage.substring(0, referencesIndex).trim()
-          : lastAssistantMessage
+    if (
+      Array.isArray(lastAssistantMessage) &&
+      lastAssistantMessage.every(
+        (item) => typeof item === 'object' && 'type' in item && 'text' in item,
+      )
+    ) {
+      cleanedAssistantMessage = lastAssistantMessage[-1]?.text || ''
+    } else if (typeof lastAssistantMessage === 'string') {
+      cleanedAssistantMessage = lastAssistantMessage
     }
+    // Remove "References:" section from assistant message if it exists
+    const referencesIndex = cleanedAssistantMessage.search(
+      /References:|Relevant Sources:/,
+    ) // TODO: make this search string more robust
+    cleanedAssistantMessage =
+      referencesIndex !== -1
+        ? cleanedAssistantMessage.substring(0, referencesIndex).trim()
+        : cleanedAssistantMessage
     const answer = `\n<Answer>\n${cleanedAssistantMessage}\n</Answer>`
     if (encoding) {
       remainingTokenBudget -= encoding.encode(answer).length
@@ -108,7 +125,7 @@ export const buildPrompt = async ({
     conversation.messages = [
       conversation.messages[conversation.messages.length - 1]!,
     ]
-    // Set final system and user prompts in the conversation
+    // P4:Set final system and user prompts in the conversation
     conversation.messages[0]!.finalPromtEngineeredMessage = userPrompt
     conversation.messages[0]!.latestSystemMessage = finalSystemPrompt
 
@@ -147,6 +164,16 @@ export const buildPrompt = async ({
       const userQuery = `\n<User Query>\n${lastUserTextInput}\n</User Query>`
       if (encoding) {
         remainingTokenBudget -= encoding.encode(userQuery).length
+      }
+      // P1.5 : get the previous conversation summary, if it exists
+      if (conversation.summary) {
+        const previousConversationSummary = `\n<Previous Conversation Summary>\n${conversation.summary}\n</Previous Conversation Summary>`
+        userPromptSections.push(previousConversationSummary)
+        if (encoding) {
+          remainingTokenBudget -= encoding.encode(
+            previousConversationSummary,
+          ).length
+        }
       }
 
       // P2: Latest 2 conversation messages (Reserved tokens)
