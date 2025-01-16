@@ -44,7 +44,7 @@ export const fetchContexts = async (
   // ]
   // return dummyContexts
 
-  const url = `https://flask-pr-327-vyriad-custom.up.railway.app/getTopContexts`
+  const url = `flask-vyriad-special-retrieval-357.up.railway.app/getTopContexts`
 
   try {
     const response = await fetch(url, {
