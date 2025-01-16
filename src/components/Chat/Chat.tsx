@@ -295,7 +295,7 @@ export const Chat = memo(
       try {
         // Log conversation to our Flask Backend (especially Nomic)
         const response = await fetch(
-          `https://flask-pr-327-vyriad-custom.up.railway.app/onResponseCompletion`,
+          `https://flask-production-751b.up.railway.app/onResponseCompletion`,
           {
             method: 'POST',
             headers: {
@@ -376,8 +376,8 @@ export const Chat = memo(
             message.contexts = []
             message.content = Array.isArray(message.content)
               ? message.content.filter(
-                  (content) => content.type !== 'tool_image_url',
-                )
+                (content) => content.type !== 'tool_image_url',
+              )
               : message.content
 
             const updatedMessages = [...(selectedConversation.messages || [])]
@@ -578,12 +578,12 @@ export const Chat = memo(
                       .map((msg) => {
                         const contentText = Array.isArray(msg.content)
                           ? msg.content
-                              .filter(
-                                (content) =>
-                                  content.type === 'text' && content.text,
-                              )
-                              .map((content) => content.text!)
-                              .join(' ')
+                            .filter(
+                              (content) =>
+                                content.type === 'text' && content.text,
+                            )
+                            .map((content) => content.text!)
+                            .join(' ')
                           : typeof msg.content === 'string'
                             ? msg.content
                             : ''
@@ -598,12 +598,12 @@ export const Chat = memo(
                       .map((msg) => {
                         const contentText = Array.isArray(msg.content)
                           ? msg.content
-                              .filter(
-                                (content) =>
-                                  content.type === 'text' && content.text,
-                              )
-                              .map((content) => content.text!)
-                              .join(' ')
+                            .filter(
+                              (content) =>
+                                content.type === 'text' && content.text,
+                            )
+                            .map((content) => content.text!)
+                            .join(' ')
                           : typeof msg.content === 'string'
                             ? msg.content
                             : ''
@@ -635,9 +635,9 @@ export const Chat = memo(
                         ? msg.content.trim()
                         : Array.isArray(msg.content)
                           ? msg.content
-                              .map((c) => c.text)
-                              .join(' ')
-                              .trim()
+                            .map((c) => c.text)
+                            .join(' ')
+                            .trim()
                           : '',
                   })),
                 },
@@ -746,7 +746,7 @@ export const Chat = memo(
                 // Check if the response is NO_REWRITE_REQUIRED or if we couldn't extract a valid query
                 if (
                   rewrittenQuery.trim().toUpperCase() ===
-                    'NO_REWRITE_REQUIRED' ||
+                  'NO_REWRITE_REQUIRED' ||
                   !extractedQuery
                 ) {
                   console.log(
@@ -1243,7 +1243,7 @@ export const Chat = memo(
 
         if (imgDescIndex !== -1) {
           // Remove the existing image description
-          ;(currentMessage.content as Content[]).splice(imgDescIndex, 1)
+          ; (currentMessage.content as Content[]).splice(imgDescIndex, 1)
         }
         if (
           selectedConversation?.messages[
@@ -1372,13 +1372,13 @@ export const Chat = memo(
 
     const statements =
       courseMetadata?.example_questions &&
-      courseMetadata.example_questions.length > 0
+        courseMetadata.example_questions.length > 0
         ? courseMetadata.example_questions
         : [
-            'Make a bullet point list of key takeaways from this project.',
-            'What are the best practices for [Activity or Process] in [Context or Field]?',
-            'Can you explain the concept of [Specific Concept] in simple terms?',
-          ]
+          'Make a bullet point list of key takeaways from this project.',
+          'What are the best practices for [Activity or Process] in [Context or Field]?',
+          'Can you explain the concept of [Specific Concept] in simple terms?',
+        ]
 
     // Add this function to create dividers with statements
     const renderIntroductoryStatements = () => {
@@ -1623,8 +1623,8 @@ export const Chat = memo(
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                 >
                   {selectedConversation &&
-                  selectedConversation.messages &&
-                  selectedConversation.messages?.length === 0 ? (
+                    selectedConversation.messages &&
+                    selectedConversation.messages?.length === 0 ? (
                     <>
                       <div className="mt-16">
                         {renderIntroductoryStatements()}
