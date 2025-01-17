@@ -45,7 +45,7 @@ export async function handleFunctionCall(
     }
     const openaiFunctionCallResponse = await response.json()
     if (openaiFunctionCallResponse.message === 'No tools invoked by OpenAI') {
-      console.error('No tools invoked by OpenAI')
+      console.debug('No tools invoked by OpenAI')
       return []
     }
 

@@ -1,3 +1,4 @@
+
 // src/pages/home/home.tsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -39,6 +40,7 @@ import { useUpdateConversation } from '~/hooks/conversationQueries'
 import { FolderType, FolderWithConversation } from '~/types/folder'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCreateFolder } from '~/hooks/folderQueries'
+import { selectBestTemperature } from '~/components/Chat/Temperature'
 
 const Home = ({
   current_email,
@@ -155,7 +157,7 @@ const Home = ({
   // Use effects for setting up the course metadata and models depending on the course/project
   useEffect(() => {
     // Set model after we fetch available models
-    if (!llmProviders || Object.keys(llmProviders).length === 0) return
+    if (Object.keys(llmProviders).length == 0) return
     const model = selectBestModel(llmProviders)
 
     dispatch({
@@ -320,6 +322,11 @@ const Home = ({
   }
 
   const handleNewConversation = () => {
+    // If we're already in an empty conversation, don't create a new one
+    if (selectedConversation && selectedConversation.messages.length === 0) {
+      return
+    }
+
     const lastConversation = conversations[conversations.length - 1]
 
     // Determine the model to use for the new conversation
@@ -327,11 +334,11 @@ const Home = ({
 
     const newConversation: Conversation = {
       id: uuidv4(),
-      name: t('New Conversation'),
+      name: '',
       messages: [],
       model: model,
       prompt: DEFAULT_SYSTEM_PROMPT,
-      temperature: lastConversation?.temperature ?? DEFAULT_TEMPERATURE,
+      temperature: selectBestTemperature(lastConversation, model, llmProviders),
       folderId: null,
       userEmail: current_email || undefined,
       projectName: course_name,
@@ -339,17 +346,8 @@ const Home = ({
       updatedAt: new Date().toISOString(),
     }
 
-    const updatedConversations = [newConversation, ...conversations]
-
+    // Only update selectedConversation, don't add to conversations list yet
     dispatch({ field: 'selectedConversation', value: newConversation })
-    dispatch({ field: 'conversations', value: updatedConversations })
-
-    // saveConversation(newConversation)
-    // saveConversations(updatedConversations)
-    // saveConversationToServer(newConversation).catch((error) => {
-    //   console.error('Error saving updated conversation to server:', error)
-    // })
-
     dispatch({ field: 'loading', value: false })
     localStorage.setItem(
       'selectedConversation',

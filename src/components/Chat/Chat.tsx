@@ -12,7 +12,7 @@ import {
 import { Button, Text } from '@mantine/core'
 import { useTranslation } from 'next-i18next'
 
-import { saveConversations } from '@/utils/app/conversation'
+import posthog from 'posthog-js'
 import { throttle } from '@/utils/data/throttle'
 import { v4 as uuidv4 } from 'uuid'
 import {
@@ -100,7 +100,7 @@ export const Chat = memo(
     // const
     const [bannerUrl, setBannerUrl] = useState<string | null>(null)
     const getCurrentPageName = () => {
-      // /CS-125/materials --> CS-125
+      // /CS-125/dashboard --> CS-125
       return router.asPath.slice(1).split('/')[0] as string
     }
     const user_email = extractEmailsFromClerk(clerk_obj.user)[0]
@@ -285,37 +285,10 @@ export const Chat = memo(
             }),
           },
         )
-        const data = await response.json()
+        // const data = await response.json()
         // return data.success
       } catch (error) {
         console.error('Error setting course data:', error)
-        // return false
-      }
-
-      try {
-        // Log conversation to our Flask Backend (especially Nomic)
-        const response = await fetch(
-          `https://flask-production-751b.up.railway.app/onResponseCompletion`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              course_name: getCurrentPageName(),
-              conversation: conversation,
-            }),
-          },
-        )
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.message)
-        return data.success
-      } catch (error) {
-        console.error(
-          'Error in chat.tsx running onResponseCompletion():',
-          error,
-        )
-        return false
       }
     }
 
@@ -340,6 +313,7 @@ export const Chat = memo(
           'handleSend called with model:',
           selectedConversation?.model,
         )
+        const startOfHandleSend = performance.now()
         setCurrentMessage(message)
         resetMessageStates()
 
@@ -548,13 +522,8 @@ export const Chat = memo(
           // console.log('vector_search_rewrite_disabled setting:', courseMetadata?.vector_search_rewrite_disabled)
 
           // Skip query rewrite if disabled in course metadata or if it's the first message
-          if (
-            courseMetadata?.vector_search_rewrite_disabled ||
-            (selectedConversation?.messages?.length ?? 0) === 0
-          ) {
-            console.log(
-              'Query rewrite disabled for this course or it is the first message, using original query',
-            )
+          if (courseMetadata?.vector_search_rewrite_disabled || updatedConversation.messages.length <= 1) {
+            console.log('Query rewrite disabled for this course or it is the first message, using original query')
             rewrittenQuery = searchQuery
             homeDispatch({ field: 'wasQueryRewritten', value: false })
             homeDispatch({ field: 'queryRewriteText', value: null })
@@ -864,6 +833,7 @@ export const Chat = memo(
             | Response
             | undefined
           let reader
+          let startOfCallToLLM
 
           if (
             selectedConversation.model &&
@@ -894,6 +864,7 @@ export const Chat = memo(
               // response = await routeModelRequest(chatBody, controller)
 
               // CALL OUR NEW ENDPOINT... /api/chat
+              startOfCallToLLM = performance.now()
               response = await fetch('/api/allNewRoutingChat', {
                 method: 'POST',
                 headers: {
@@ -979,6 +950,19 @@ export const Chat = memo(
 
           if (!plugin) {
             homeDispatch({ field: 'loading', value: false })
+
+            if (startOfCallToLLM) {
+              // Calculate TTFT (Time To First Token)
+              const ttft = performance.now() - startOfCallToLLM
+              const fromSendToLLMResponse = performance.now() - startOfHandleSend
+              // LLM Starts responding 
+              posthog.capture('ttft', {
+                course_name: chatBody.course_name,
+                model: chatBody.model,
+                llmRequestToFirstToken: Math.round(ttft), // Round to whole number of milliseconds
+                fromSendToLLMResponse: Math.round(fromSendToLLMResponse)
+              })
+            }
 
             const decoder = new TextDecoder()
             let done = false
@@ -1406,7 +1390,13 @@ export const Chat = memo(
                 <div
                   key={index}
                   className="w-full rounded-lg border-b-2 border-[rgba(42,42,64,0.4)] hover:cursor-pointer hover:bg-[rgba(42,42,64,0.9)]"
-                  onClick={() => setInputContent(statement)}
+                  onClick={() => {
+                    setInputContent('')  // First clear the input
+                    setTimeout(() => {   // Then set it with a small delay
+                      setInputContent(statement)
+                      textareaRef.current?.focus()
+                    }, 0)
+                  }}
                 >
                   <Button
                     variant="link"
