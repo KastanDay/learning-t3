@@ -204,7 +204,7 @@ export const Chat = memo(({ stopConversationRef, courseMetadata }: Props) => {
   useEffect(() => {
     if (courseMetadata?.banner_image_s3) {
       console.log('Fetching course banner url')
-      fetchPresignedUrl(courseMetadata.banner_image_s3).then((url) => {
+      fetchPresignedUrl(courseMetadata.banner_image_s3, getCurrentPageName()).then((url) => {
         console.log('Setting course banner url')
         setBannerUrl(url)
       })
@@ -808,6 +808,7 @@ export const Chat = memo(({ stopConversationRef, courseMetadata }: Props) => {
                         selectedConversation?.messages.length - index,
                       )
                     }}
+                    courseName={getCurrentPageName()}
                   />
                 ))}
                 {loading && <ChatLoader />}

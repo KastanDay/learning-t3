@@ -100,10 +100,11 @@ export interface Props {
   context?: ContextWithMetadata[]
   contentRenderer?: (message: Message) => JSX.Element
   onImageUrlsUpdate?: (message: Message, messageIndex: number) => void
+  courseName: string
 }
 
 export const ChatMessage: FC<Props> = memo(
-  ({ message, messageIndex, onEdit, onFeedback, onImageUrlsUpdate }) => {
+  ({ message, messageIndex, onEdit, onFeedback, onImageUrlsUpdate, courseName }) => {
     const { t } = useTranslation('chat')
 
     const {
@@ -241,7 +242,7 @@ export const ChatMessage: FC<Props> = memo(
                     'Image url was invalid, fetching presigned url for: ',
                     path,
                   )
-                  const presignedUrl = await getPresignedUrl(path)
+                  const presignedUrl = await getPresignedUrl(path, courseName)
                   setImageUrls(
                     (prevUrls) => new Set([...prevUrls, presignedUrl]),
                   )
@@ -426,9 +427,9 @@ export const ChatMessage: FC<Props> = memo(
       }
     }, [isEditing])
 
-    async function getPresignedUrl(uploadedImageUrl: string): Promise<string> {
+    async function getPresignedUrl(uploadedImageUrl: string, courseName: string): Promise<string> {
       try {
-        const presignedUrl = await fetchPresignedUrl(uploadedImageUrl)
+        const presignedUrl = await fetchPresignedUrl(uploadedImageUrl, courseName)
         return presignedUrl as string
       } catch (error) {
         console.error(
@@ -504,7 +505,7 @@ export const ChatMessage: FC<Props> = memo(
             if (tool.output && tool.output.s3Paths) {
               const imageUrls = await Promise.all(
                 tool.output.s3Paths.map(async (s3Path) => {
-                  return getPresignedUrl(s3Path)
+                  return getPresignedUrl(s3Path, courseName)
                 }),
               )
               tool.output.imageUrls = tool.output.imageUrls
@@ -523,7 +524,7 @@ export const ChatMessage: FC<Props> = memo(
                       // This will only work for internal S3 URLs
                       console.log('Image URL is expired')
                       const s3_path = extractPathFromUrl(imageUrl)
-                      return getPresignedUrl(s3_path)
+                      return getPresignedUrl(s3_path, courseName)
                     }
                     return imageUrl
                   },
@@ -539,7 +540,7 @@ export const ChatMessage: FC<Props> = memo(
                   if (!isValid) {
                     console.log('Image URL is expired')
                     const s3_path = extractPathFromUrl(imageUrl)
-                    return getPresignedUrl(s3_path)
+                    return getPresignedUrl(s3_path, courseName)
                   }
                   return imageUrl
                 }),
@@ -555,11 +556,10 @@ export const ChatMessage: FC<Props> = memo(
 
     return (
       <div
-        className={`group md:px-6 ${
-          message.role === 'assistant'
-            ? 'border-b border-black/10 bg-gray-50/50 text-gray-800 dark:border-[rgba(42,42,120,0.50)] dark:bg-[#202134] dark:text-gray-100'
-            : 'border-b border-black/10 bg-white/50 text-gray-800 dark:border-[rgba(42,42,120,0.50)] dark:bg-[#15162B] dark:text-gray-100'
-        } max-w-[100%]`}
+        className={`group md:px-6 ${message.role === 'assistant'
+          ? 'border-b border-black/10 bg-gray-50/50 text-gray-800 dark:border-[rgba(42,42,120,0.50)] dark:bg-[#202134] dark:text-gray-100'
+          : 'border-b border-black/10 bg-white/50 text-gray-800 dark:border-[rgba(42,42,120,0.50)] dark:bg-[#15162B] dark:text-gray-100'
+          } max-w-[100%]`}
         style={{ overflowWrap: 'anywhere' }}
       >
         <div className="relative flex w-full px-2 py-4 text-base md:mx-[5%] md:max-w-[90%] md:gap-6 md:p-6 lg:mx-[10%]">
@@ -666,10 +666,10 @@ export const ChatMessage: FC<Props> = memo(
                             {isImg2TextLoading &&
                               (messageIndex ===
                                 (selectedConversation?.messages.length ?? 0) -
-                                  1 ||
+                                1 ||
                                 messageIndex ===
-                                  (selectedConversation?.messages.length ?? 0) -
-                                    2) && (
+                                (selectedConversation?.messages.length ?? 0) -
+                                2) && (
                                 <IntermediateStateAccordion
                                   accordionKey="imageDescription"
                                   title="Image Description"
@@ -695,22 +695,22 @@ export const ChatMessage: FC<Props> = memo(
                                   ?.trim()
                                   .startsWith('Image description:'),
                             ) && (
-                              <IntermediateStateAccordion
-                                accordionKey="imageDescription"
-                                title="Image Description"
-                                isLoading={false}
-                                error={false}
-                                content={
-                                  message.content.find(
-                                    (content) =>
-                                      content.type === 'text' &&
-                                      content.text
-                                        ?.trim()
-                                        .startsWith('Image description:'),
-                                  )?.text ?? 'No image description found'
-                                }
-                              />
-                            )}
+                                <IntermediateStateAccordion
+                                  accordionKey="imageDescription"
+                                  title="Image Description"
+                                  isLoading={false}
+                                  error={false}
+                                  content={
+                                    message.content.find(
+                                      (content) =>
+                                        content.type === 'text' &&
+                                        content.text
+                                          ?.trim()
+                                          .startsWith('Image description:'),
+                                    )?.text ?? 'No image description found'
+                                  }
+                                />
+                              )}
                           </div>
                         </>
                       ) : (
@@ -765,8 +765,8 @@ export const ChatMessage: FC<Props> = memo(
                           (messageIndex ===
                             (selectedConversation?.messages.length ?? 0) - 1 ||
                             messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                2) && (
+                            (selectedConversation?.messages.length ?? 0) -
+                            2) && (
                             <IntermediateStateAccordion
                               accordionKey="retrieval loading"
                               title="Retrieving documents"
@@ -781,8 +781,8 @@ export const ChatMessage: FC<Props> = memo(
                           (messageIndex ===
                             (selectedConversation?.messages.length ?? 0) - 1 ||
                             messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                2) && (
+                            (selectedConversation?.messages.length ?? 0) -
+                            2) && (
                             <IntermediateStateAccordion
                               accordionKey={`routing tools`}
                               title={'Routing the request to relevant tools'}
@@ -798,8 +798,8 @@ export const ChatMessage: FC<Props> = memo(
                           (messageIndex ===
                             (selectedConversation?.messages.length ?? 0) - 1 ||
                             messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                2) && (
+                            (selectedConversation?.messages.length ?? 0) -
+                            2) && (
                             <>
                               {message.tools.map((response, index) => (
                                 <IntermediateStateAccordion
@@ -882,82 +882,82 @@ export const ChatMessage: FC<Props> = memo(
                         {(messageIndex ===
                           (selectedConversation?.messages.length ?? 0) - 1 ||
                           messageIndex ===
-                            (selectedConversation?.messages.length ?? 0) -
-                              2) && (
-                          <>
-                            {message.tools?.map((response, index) => (
-                              <IntermediateStateAccordion
-                                key={`tool-${index}`}
-                                accordionKey={`tool-${index}`}
-                                title={
-                                  <>
-                                    Tool output from{' '}
-                                    <Badge
-                                      color={response.error ? 'red' : 'grape'}
-                                      radius="md"
-                                      size="sm"
-                                    >
-                                      {response.readableName}
-                                    </Badge>
-                                  </>
-                                }
-                                isLoading={
-                                  response.output === undefined &&
-                                  response.error === undefined
-                                }
-                                error={response.error ? true : false}
-                                content={
-                                  <>
-                                    {response.error ? (
-                                      <span>{response.error}</span>
-                                    ) : (
-                                      <>
-                                        <div
-                                          style={{
-                                            display: 'flex',
-                                            overflowX: 'auto',
-                                            gap: '10px',
-                                          }}
-                                        >
-                                          {response.output?.imageUrls &&
-                                            response.output?.imageUrls.map(
-                                              (imageUrl, index) => (
-                                                <div
-                                                  key={index}
-                                                  className={
-                                                    classes.imageContainerStyle
-                                                  }
-                                                >
-                                                  <div className="overflow-hidden rounded-lg shadow-lg">
-                                                    <ImagePreview
-                                                      src={imageUrl}
-                                                      alt={`Tool output image ${index}`}
-                                                      className={
-                                                        classes.imageStyle
-                                                      }
-                                                    />
+                          (selectedConversation?.messages.length ?? 0) -
+                          2) && (
+                            <>
+                              {message.tools?.map((response, index) => (
+                                <IntermediateStateAccordion
+                                  key={`tool-${index}`}
+                                  accordionKey={`tool-${index}`}
+                                  title={
+                                    <>
+                                      Tool output from{' '}
+                                      <Badge
+                                        color={response.error ? 'red' : 'grape'}
+                                        radius="md"
+                                        size="sm"
+                                      >
+                                        {response.readableName}
+                                      </Badge>
+                                    </>
+                                  }
+                                  isLoading={
+                                    response.output === undefined &&
+                                    response.error === undefined
+                                  }
+                                  error={response.error ? true : false}
+                                  content={
+                                    <>
+                                      {response.error ? (
+                                        <span>{response.error}</span>
+                                      ) : (
+                                        <>
+                                          <div
+                                            style={{
+                                              display: 'flex',
+                                              overflowX: 'auto',
+                                              gap: '10px',
+                                            }}
+                                          >
+                                            {response.output?.imageUrls &&
+                                              response.output?.imageUrls.map(
+                                                (imageUrl, index) => (
+                                                  <div
+                                                    key={index}
+                                                    className={
+                                                      classes.imageContainerStyle
+                                                    }
+                                                  >
+                                                    <div className="overflow-hidden rounded-lg shadow-lg">
+                                                      <ImagePreview
+                                                        src={imageUrl}
+                                                        alt={`Tool output image ${index}`}
+                                                        className={
+                                                          classes.imageStyle
+                                                        }
+                                                      />
+                                                    </div>
                                                   </div>
-                                                </div>
-                                              ),
-                                            )}
-                                        </div>
-                                        <div>
-                                          {response.output?.text
-                                            ? response.output.text
-                                            : JSON.stringify(
+                                                ),
+                                              )}
+                                          </div>
+                                          <div>
+                                            {response.output?.text
+                                              ? response.output.text
+                                              : JSON.stringify(
                                                 response.output?.data,
                                                 null,
                                                 2,
                                               )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </>
-                                }
-                              />
-                            ))}
-                          </>
-                        )}
+                                          </div>
+                                        </>
+                                      )}
+                                    </>
+                                  }
+                                />
+                              ))}
+                            </>
+                          )}
                         {(() => {
                           if (
                             messageIsStreaming === undefined ||
@@ -986,8 +986,8 @@ export const ChatMessage: FC<Props> = memo(
                           (messageIndex ===
                             (selectedConversation?.messages.length ?? 0) - 1 ||
                             messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                2) &&
+                            (selectedConversation?.messages.length ?? 0) -
+                            2) &&
                           (!message.tools ||
                             message.tools.every(
                               (tool) =>
@@ -1241,7 +1241,7 @@ export const ChatMessage: FC<Props> = memo(
                       if (
                         messageIsStreaming &&
                         messageIndex ===
-                          (selectedConversation?.messages.length ?? 0) - 1
+                        (selectedConversation?.messages.length ?? 0) - 1
                       ) {
                         return `${message.content} ▍`
                       }

@@ -206,10 +206,10 @@ export const ChatInput = ({
           imageUrls.length > 0
             ? imageUrls
             : await Promise.all(
-                imageFiles.map((file) =>
-                  uploadImageAndGetUrl(file, courseName),
-                ),
-              )
+              imageFiles.map((file) =>
+                uploadImageAndGetUrl(file, courseName),
+              ),
+            )
 
         // Construct image content for the message
         imageContent = imageUrlsToUse
@@ -666,9 +666,8 @@ export const ChatInput = ({
     if (textareaRef && textareaRef.current) {
       textareaRef.current.style.height = 'inherit'
       textareaRef.current.style.height = `${textareaRef.current?.scrollHeight}px`
-      textareaRef.current.style.overflow = `${
-        textareaRef?.current?.scrollHeight > 400 ? 'auto' : 'hidden'
-      }`
+      textareaRef.current.style.overflow = `${textareaRef?.current?.scrollHeight > 400 ? 'auto' : 'hidden'
+        }`
     }
   }, [content])
 
@@ -733,7 +732,7 @@ export const ChatInput = ({
   ): Promise<string> {
     try {
       const uploadedImageUrl = await uploadToS3(file, courseName)
-      const presignedUrl = await fetchPresignedUrl(uploadedImageUrl as string)
+      const presignedUrl = await fetchPresignedUrl(uploadedImageUrl as string, courseName)
       return presignedUrl as string
     } catch (error) {
       console.error('Upload failed for file', file.name, error)
@@ -897,12 +896,11 @@ export const ChatInput = ({
             {/* Button 3: main input text area  */}
             <div
               className={`
-                ${
-                  VisionCapableModels.has(
-                    selectedConversation?.model?.id as OpenAIModelID,
-                  )
-                    ? 'pl-8'
-                    : 'pl-1'
+                ${VisionCapableModels.has(
+                selectedConversation?.model?.id as OpenAIModelID,
+              )
+                  ? 'pl-8'
+                  : 'pl-1'
                 }
                   `}
             >

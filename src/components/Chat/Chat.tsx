@@ -139,7 +139,7 @@ export const Chat = memo(
         courseMetadata?.banner_image_s3 &&
         courseMetadata.banner_image_s3 !== ''
       ) {
-        fetchPresignedUrl(courseMetadata.banner_image_s3).then((url) => {
+        fetchPresignedUrl(courseMetadata.banner_image_s3, courseName).then((url) => {
           setBannerUrl(url)
         })
       }
@@ -1068,6 +1068,7 @@ export const Chat = memo(
                           lastUserMessage,
                           stateMachineContext,
                           citationLinkCache,
+                          getCurrentPageName()
                         )
 
                       // Update the last message with the new content
@@ -1650,6 +1651,7 @@ export const Chat = memo(
                           }}
                           onFeedback={handleFeedback}
                           onImageUrlsUpdate={onImageUrlsUpdate}
+                          courseName={courseName}
                         />
                       ))}
                       {loading && <ChatLoader />}
