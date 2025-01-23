@@ -14,13 +14,13 @@ const s3Client = new S3Client({
   // If MINIO_ENDPOINT is defined, use it instead of AWS S3.
   ...(process.env.MINIO_ENDPOINT
     ? {
-        endpoint: process.env.MINIO_ENDPOINT,
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId: process.env.AWS_KEY,
-          secretAccessKey: process.env.AWS_SECRET,
-        },
-      }
+      endpoint: process.env.MINIO_ENDPOINT,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: process.env.AWS_KEY,
+        secretAccessKey: process.env.AWS_SECRET,
+      },
+    }
     : {}),
 })
 
@@ -38,7 +38,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       Key: s3_filepath,
       Expires: 60 * 60, // 1 hour
     })
-
+    console.log('s3 path from uploadtos3', post)
     res
       .status(200)
       .json({ message: 'Presigned URL generated successfully', post })

@@ -38,7 +38,7 @@ const handler = async (
     const s3_filepath = `courses/${courseName}/${uniqueFileName}`
 
     const response = await fetch(
-      'https://app.beam.cloud/taskqueue/ingest_task_queue/latest',
+      'https://app.beam.cloud/taskqueue/ruixin-pr220_ingest_task_queue/latest',
       {
         method: 'POST',
         headers: {
@@ -60,6 +60,28 @@ const handler = async (
       `📤 Submitted to ingest queue: ${s3_filepath}. Response status: ${response.status}`,
       responseBody,
     )
+
+    // Send to ingest-in-progress table
+    const { error } = await supabase.from('documents_in_progress').insert({
+      s3_path: s3_filepath,
+      course_name: courseName,
+      readable_filename: readableFilename,
+      beam_task_id: responseBody.task_id,
+    })
+
+    if (error) {
+      console.error(
+        '❌❌ Supabase failed to insert into `documents_in_progress`:',
+        error,
+      )
+      posthog.capture('supabase_failure_insert_documents_in_progress', {
+        s3_path: s3_filepath,
+        course_name: courseName,
+        readable_filename: readableFilename,
+        error: error.message,
+        beam_task_id: responseBody.task_id,
+      })
+    }
 
     return res.status(200).json(responseBody)
   } catch (error) {

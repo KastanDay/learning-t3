@@ -37,6 +37,7 @@ import axios from 'axios'
 import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
+import { IndentIncrease } from 'tabler-icons-react'
 const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
@@ -209,6 +210,8 @@ export default function WebsiteIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
+      console.log('files in docsInProgress', data)
+
       setUploadFiles((prev) => {
         const currentBaseUrls = new Set(prev.map((file) => file.name));
 
@@ -223,12 +226,14 @@ export default function WebsiteIngestForm({
             // url: doc.url,
             status: 'ingesting' as const,
           })) || [];
-
+        console.log('files in docsInProgress after adding new urls', newFiles)
         // Update existing files and add new files
         const updatedFiles = prev.map((file) => {
           const isIngesting = data?.documents?.some(
             (doc: { url: string }) => doc.url === file.name
           );
+          console.log('isIngesting in the docs in progress table', isIngesting)
+          console.log('Current upload files status:', prev.map(file => file.status))
           if (file.status === 'uploading' && isIngesting) {
             return { ...file, status: 'ingesting' as const };
           } else if (file.status === 'ingesting' && !isIngesting) {
@@ -239,13 +244,14 @@ export default function WebsiteIngestForm({
 
         return [...updatedFiles, ...newFiles];
       });
+      const ingestingFile =
+        console.log("")
     }
     const interval = setInterval(checkIngestStatus, 3000)
     return () => {
       clearInterval(interval)
     }
   }, [project_name])
-
 
   const scrapeWeb = async (
     url: string | null,

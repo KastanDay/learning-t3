@@ -258,8 +258,8 @@ export function LargeDropzone({
         return prev.map((file) => {
           if (file.status === 'uploading') {
             const isIngesting = data?.documents?.some(
-              (doc: { base_url: string }) =>
-                doc.base_url === file.name,
+              (doc: { readable_filename: string }) =>
+                doc.readable_filename === file.name,
             )
             if (isIngesting) {
               return { ...file, status: 'ingesting' as const }
@@ -267,8 +267,8 @@ export function LargeDropzone({
           }
           else if (file.status === 'ingesting') {
             const isStillIngesting = data?.documents?.some(
-              (doc: { base_url: string }) =>
-                doc.base_url === file.name,
+              (doc: { readable_filename: string }) =>
+                doc.readable_filename === file.name,
             )
             if (!isStillIngesting) {
               return { ...file, status: 'complete' as const }
