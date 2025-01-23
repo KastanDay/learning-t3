@@ -38,7 +38,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       Key: s3_filepath,
       Expires: 60 * 60, // 1 hour
     })
-    console.log('s3 path from uploadtos3', post)
+
     res
       .status(200)
       .json({ message: 'Presigned URL generated successfully', post })
