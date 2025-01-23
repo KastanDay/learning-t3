@@ -77,7 +77,7 @@ export const OllamaModels: Record<OllamaModelIDs, OllamaModel> = {
   },
   [OllamaModelIDs.DEEPSEEK_R1_14b_qwen_fp16]: {
     id: OllamaModelIDs.DEEPSEEK_R1_14b_qwen_fp16,
-    name: 'Deepseek R1 14B (based on Qwen FP16)',
+    name: 'Deepseek R1 14B (based on Qwen)',
     parameterSize: '14B',
     tokenLimit: 6_300,
     enabled: true,

@@ -80,9 +80,9 @@ function convertConversatonToVercelAISDKv3(
       // Use finalPromtEngineeredMessage for the most recent user message
       content = message.finalPromtEngineeredMessage || ''
 
-      // just for Llama 3.1 70b, remind it to use proper citation format.
-      content +=
-        '\nWhen writing equations, always use MathJax/KaTeX notation.\n\nIf you use the <Potentially Relevant Documents> in your response, please remember cite your sources using the required formatting, e.g. "The grass is green. [29, page: 11]'
+      // just for Ollama models remind it to use proper citation format.
+      // content +=
+      //   '\nWhen writing equations, always use MathJax/KaTeX notation (no need to repeat this to the user, just follow that formatting system when writing equations).'
     } else if (Array.isArray(message.content)) {
       // Combine text content from array
       content = message.content
