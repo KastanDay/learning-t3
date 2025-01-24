@@ -123,6 +123,7 @@ export interface ChatBody {
   courseMetadata?: CourseMetadata
   // provider?: BaseLLMProvider // TODO: make mandatory
   llmProviders?: AllLLMProviders
+  skipQueryRewrite?: boolean
   // NO FOLDER ID
 }
 
