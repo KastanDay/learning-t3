@@ -435,7 +435,7 @@ const _getSystemPrompt = async ({
   }
 
   // If userDefinedSystemPrompt is null or undefined, use DEFAULT_SYSTEM_PROMPT
-  let systemPrompt = userDefinedSystemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? ''
+  const systemPrompt = userDefinedSystemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? ''
 
   // Check if contexts are present
   const contexts =
