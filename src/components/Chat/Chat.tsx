@@ -334,15 +334,15 @@ export const Chat = memo(
     }
 
     const onMessageReceived = async (conversation: Conversation) => {
-      // Call LLM for conversation summary
-      const summary = await callLLMForMessageSummary(conversation)
-      console.debug('summary: ', summary)
-      conversation = updateConversationWithSummary(conversation, summary)
-      // Update the selected conversation
-      homeDispatch({
-        field: 'selectedConversation',
-        value: conversation,
-      })
+      // // Call LLM for conversation summary
+      // const summary = await callLLMForMessageSummary(conversation)
+      // console.debug('summary: ', summary)
+      // conversation = updateConversationWithSummary(conversation, summary)
+      // // Update the selected conversation
+      // homeDispatch({
+      //   field: 'selectedConversation',
+      //   value: conversation,
+      // })
 
       // Log conversation to Supabase
       try {
@@ -388,7 +388,7 @@ export const Chat = memo(
           'handleSend called with model:',
           selectedConversation?.model,
         )
-        
+
         const startOfHandleSend = performance.now()
         setCurrentMessage(message)
         resetMessageStates()
@@ -1025,13 +1025,14 @@ export const Chat = memo(
             if (startOfCallToLLM) {
               // Calculate TTFT (Time To First Token)
               const ttft = performance.now() - startOfCallToLLM
-              const fromSendToLLMResponse = performance.now() - startOfHandleSend
-              // LLM Starts responding 
+              const fromSendToLLMResponse =
+                performance.now() - startOfHandleSend
+              // LLM Starts responding
               posthog.capture('ttft', {
                 course_name: chatBody.course_name,
                 model: chatBody.model,
                 llmRequestToFirstToken: Math.round(ttft), // Round to whole number of milliseconds
-                fromSendToLLMResponse: Math.round(fromSendToLLMResponse)
+                fromSendToLLMResponse: Math.round(fromSendToLLMResponse),
               })
             }
 
@@ -1097,6 +1098,14 @@ export const Chat = memo(
                     ...updatedConversation,
                     messages: updatedMessages,
                   }
+
+                  // Call LLM for conversation summary
+                  const summary =
+                    await callLLMForMessageSummary(updatedConversation)
+                  updatedConversation = updateConversationWithSummary(
+                    updatedConversation,
+                    summary,
+                  )
                   homeDispatch({
                     field: 'selectedConversation',
                     value: updatedConversation,
@@ -1141,6 +1150,13 @@ export const Chat = memo(
                         ...updatedConversation,
                         messages: updatedMessages as Message[],
                       }
+                      // Call LLM for conversation summary
+                      const summary =
+                        await callLLMForMessageSummary(updatedConversation)
+                      updatedConversation = updateConversationWithSummary(
+                        updatedConversation,
+                        summary,
+                      )
                       // Dispatch the updated conversation
                       homeDispatch({
                         field: 'selectedConversation',
