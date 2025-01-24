@@ -1,7 +1,5 @@
 import { ContextWithMetadata } from '~/types/chat'
 
-
-
 export const fetchContexts = async (
   course_name: string,
   search_query: string,
