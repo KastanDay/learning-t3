@@ -55,6 +55,19 @@ export async function getSystemPrompt(course_name: string) {
   )
 }
 
+/**
+ * Generates a prompt for the chatbot based on the course name, search query, contexts, and token limit.
+ * Handles the case where the course name is 'Law794-TransactionalDraftingAlam' and adjusts the prompt accordingly.
+ * Ensures that the total number of tokens in the prompt does not exceed the token limit.
+ * Catches and throws any errors that occur during its execution.
+ *
+ * @param {string} course_name - The name of the course.
+ * @param {string} searchQuery - The search query.
+ * @param {ContextWithMetadata[]} contexts - The contexts.
+ * @param {number} tokenLimit - The token limit. Defaults to 8000.
+ * @returns {string} The generated prompt.
+ * @throws {Error} If an error occurs during the execution of the function.
+ */
 export async function getStuffedPrompt(
   course_name: string,
   searchQuery: string,
