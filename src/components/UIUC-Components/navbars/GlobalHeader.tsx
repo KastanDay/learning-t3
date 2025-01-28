@@ -1,52 +1,59 @@
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-  useUser,
-} from '@clerk/nextjs'
+// import {
+//   SignedIn,
+//   SignedOut,
+//   SignInButton,
+//   UserButton,
+//   useUser,
+// } from '@clerk/nextjs'
 import { IconClipboardText, IconFile } from '@tabler/icons-react'
 // import MagicBell, {
 //   FloatingNotificationInbox,
 // } from '@magicbell/magicbell-react'
+import { useAuth } from 'react-oidc-context'
 
 export default function Header({ isNavbar = false }: { isNavbar?: boolean }) {
+  const { classes } = useStyles();
   const headerStyle = isNavbar
     ? {
-        backgroundColor: '#15162c',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        padding: '0.2em 0.2em',
-        paddingRight: '0.3em',
-      }
+      backgroundColor: '#15162c',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '0.2em 0.2em',
+      paddingRight: '0.3em',
+    }
     : {
-        backgroundColor: '#2e026d',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        padding: '1em',
-      }
-
-  const clerk_obj = useUser()
+      backgroundColor: '#2e026d',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '1em',
+    }
+  //   const clerk_obj = useUser()
+  const auth = useAuth()
   const posthog = usePostHog()
-  const [userEmail, setUserEmail] = useState('no_email')
+  //   const [userEmail, setUserEmail] = useState('no_email')
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
-    if (clerk_obj.isLoaded) {
-      if (clerk_obj.isSignedIn) {
-        const emails = extractEmailsFromClerk(clerk_obj.user)
-        setUserEmail(emails[0] || 'no_email')
-
+    //if (clerk_obj.isLoaded) {
+    // if (clerk_obj.isSignedIn) {
+    //   const emails = extractEmailsFromClerk(clerk_obj.user)
+    //   setUserEmail(emails[0] || 'no_email')
+    if (!auth.isLoading) {
+      if (auth.isAuthenticated) {
         // Posthog identify
-        posthog?.identify(clerk_obj.user.id, {
-          email: emails[0] || 'no_email',
+        // posthog?.identify(clerk_obj.user.id, {
+        // email: emails[0] || 'no_email',
+        posthog?.identify(auth.user?.profile.sub || 'unknown', {
+          email: auth.user?.profile.email || 'no_email',
         })
       }
       setIsLoaded(true)
-    } else {
-      // console.debug('NOT LOADED OR SIGNED IN')
     }
-  }, [clerk_obj.isLoaded])
+    //} else {
+    // console.debug('NOT LOADED OR SIGNED IN')
+    //     }
+    // }, [clerk_obj.isLoaded])
+  }, [auth.isLoading])
 
   if (!isLoaded) {
     return (
@@ -69,9 +76,9 @@ export default function Header({ isNavbar = false }: { isNavbar?: boolean }) {
 
   return (
     <header style={headerStyle} className="py-16">
-      <SignedIn>
-        {/* Docs: https://www.magicbell.com/docs/libraries/react#custom-themes */}
-        {/* <MagicBell
+      {/* <SignedIn> */}
+      {/* Docs: https://www.magicbell.com/docs/libraries/react#custom-themes */}
+      {/* <MagicBell
           apiKey={process.env.NEXT_PUBLIC_MAGIC_BELL_API as string}
           userEmail={userEmail}
           theme={magicBellTheme}
@@ -81,30 +88,63 @@ export default function Header({ isNavbar = false }: { isNavbar?: boolean }) {
               'https://assets.kastan.ai/minified_empty_chat_art.png',
           }}
         > */}
-        {/* {(props) => (
+      {/* {(props) => (
             <FloatingNotificationInbox width={400} height={500} {...props} />
           )}
         </MagicBell> */}
-        {/* Add some padding for separation */}
-        <div style={{ paddingLeft: '0px', paddingRight: '10px' }}></div>
-        {/* Mount the UserButton component */}
-        <UserButton />
+      {/* Add some padding for separation */}
+      {/* <div style={{ paddingLeft: '0px', paddingRight: '10px' }}></div> */}
+      {/* Mount the UserButton component */}
+      {/* <UserButton />
       </SignedIn>
-      <SignedOut>
-        {/* Signed out users get sign in button */}
-        <SignInButton />
-      </SignedOut>
+      <SignedOut> */}
+      {/* Signed out users get sign in button */}
+      {/* <SignInButton />
+      </SignedOut> */}
+      {auth.isAuthenticated ? (
+      <Group spacing={'xs'} style={{ paddingLeft: '.65em', paddingRight: '1em' }}>
+        <Menu
+          position="bottom-end"
+          offset={5}
+        >
+          <Menu.Target>
+          <div className={classes.avatarButton}>
+            <Avatar 
+              size="sm"
+              radius="xl"
+              variant='filled'
+              color="violet"
+            >
+              {getInitials(auth.user?.profile.name || '')}
+            </Avatar>
+            </div>
+          </Menu.Target>
+
+          <Menu.Dropdown>
+            <Menu.Item onClick={() => auth.signoutRedirect()}>
+              Sign Out
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
+      </Group>
+    ) : (
+      <div>
+        <Link href="/sign-in" >Sign in</Link>
+        <Link href="/sign-up" style={{ marginLeft: '10px' }}>Sign up</Link>
+      </div>
+    )}
     </header>
   )
 }
 
 import Link from 'next/link'
 import { montserrat_heading } from 'fonts'
-import { createStyles, Group, rem } from '@mantine/core'
+import { Avatar, createStyles, Group, Menu, rem } from '@mantine/core'
 import { extractEmailsFromClerk } from '../clerkHelpers'
 import { useEffect, useState } from 'react'
 import { usePostHog } from 'posthog-js/react'
 import { IconFilePlus } from '@tabler/icons-react'
+import { getInitials } from './ChatNavbar'
 
 export function LandingPageHeader({
   forGeneralPurposeNotLandingpage = false,
@@ -114,39 +154,50 @@ export function LandingPageHeader({
   const { classes, theme } = useStyles()
   const headerStyle = forGeneralPurposeNotLandingpage
     ? {
-        backgroundColor: '#2e026d',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        padding: '2em 2em',
-      }
+      backgroundColor: '#2e026d',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '2em 2em',
+    }
     : {
-        backgroundColor: '#2e026d',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        padding: '1em',
-      }
+      backgroundColor: '#2e026d',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '1em',
+    }
 
-  const clerk_obj = useUser()
+  // const clerk_obj = useUser()
+  const auth = useAuth()
   const [userEmail, setUserEmail] = useState('no_email')
   const [isLoaded, setIsLoaded] = useState(false)
   const posthog = usePostHog()
 
   useEffect(() => {
-    if (clerk_obj.isLoaded) {
-      if (clerk_obj.isSignedIn) {
-        const emails = extractEmailsFromClerk(clerk_obj.user)
-        setUserEmail(emails[0] || 'no_email')
+    //   if (clerk_obj.isLoaded) {
+    //     if (clerk_obj.isSignedIn) {
+    //       const emails = extractEmailsFromClerk(clerk_obj.user)
+    //       setUserEmail(emails[0] || 'no_email')
 
+    //       // Posthog identify
+    //       posthog?.identify(clerk_obj.user.id, {
+    //         email: emails[0] || 'no_email',
+    //       })
+    //     }
+    //     setIsLoaded(true)
+    //   } else {
+    //     // console.debug('NOT LOADED OR SIGNED IN')
+    //   }
+    // }, [clerk_obj.isLoaded])
+    if (!auth.isLoading) {
+      if (auth.isAuthenticated) {
         // Posthog identify
-        posthog?.identify(clerk_obj.user.id, {
-          email: emails[0] || 'no_email',
+        posthog?.identify(auth.user?.profile.sub || 'unknown', {
+          email: auth.user?.profile.email || 'no_email',
         })
       }
       setIsLoaded(true)
-    } else {
-      // console.debug('NOT LOADED OR SIGNED IN')
     }
-  }, [clerk_obj.isLoaded])
+  }, [auth.isLoading])
 
   if (!isLoaded) {
     return (
@@ -198,39 +249,9 @@ export function LandingPageHeader({
 
   return (
     <header style={headerStyle}>
-      <Group spacing={'xs'}>
-        {forGeneralPurposeNotLandingpage === false && (
-          <>
-            <Link href="/new" className={classes.link}>
-              <span style={{ display: 'flex', alignItems: 'center' }}>
-                <FileIcon />
-                <span
-                  className={`${montserrat_heading.variable} font-montserratHeading`}
-                >
-                  New project
-                </span>
-              </span>
-            </Link>
-            <Link
-              href="https://docs.uiuc.chat/"
-              className={classes.link}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span style={{ display: 'flex', alignItems: 'center' }}>
-                <IconClipboardTexts />
-                <span
-                  className={`${montserrat_heading.variable} font-montserratHeading`}
-                >
-                  Docs
-                </span>
-              </span>
-            </Link>
-          </>
-        )}
-        <SignedIn>
-          {/* Docs: https://www.magicbell.com/docs/libraries/react#custom-themes */}
-          {/* <MagicBell
+      {/* <SignedIn> */}
+      {/* Docs: https://www.magicbell.com/docs/libraries/react#custom-themes */}
+      {/* <MagicBell
             apiKey={process.env.NEXT_PUBLIC_MAGIC_BELL_API as string}
             userEmail={userEmail}
             theme={magicBellTheme}
@@ -244,16 +265,16 @@ export function LandingPageHeader({
               <FloatingNotificationInbox width={400} height={500} {...props} />
             )}
           </MagicBell> */}
-          {/* Add a bit of spacing with an empty div */}
-          <div />
-          {/* appearance={ } */}
-          <div style={{ all: 'unset' }}>
+      {/* Add a bit of spacing with an empty div */}
+      {/* <div /> */}
+      {/* appearance={ } */}
+      {/* <div style={{ all: 'unset' }}>
             <UserButton />
           </div>
-        </SignedIn>
-        <SignedOut>
-          {/* Signed out users get sign in button */}
-          <SignInButton>
+        </SignedIn> */}
+      {/* <SignedOut> */}
+      {/* Signed out users get sign in button */}
+      {/* <SignInButton>
             <button className={classes.link}>
               <span
                 className={`${montserrat_heading.variable} font-montserratHeading`}
@@ -261,10 +282,65 @@ export function LandingPageHeader({
                 Sign in / Sign up
               </span>
             </button>
-          </SignInButton>
-        </SignedOut>
+          </SignInButton> */}
+      {/* </SignedOut> */}
+      <Group spacing={'xs'}>
+        <>
+          <Link href="/new" className={classes.link}>
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              <FileIcon />
+              <span className={`${montserrat_heading.variable} font-montserratHeading`}>
+                New project
+              </span>
+            </span>
+          </Link>
+          <Link
+            href="https://docs.uiuc.chat/"
+            className={classes.link}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span style={{ display: 'flex', alignItems: 'center' }}>
+              <IconClipboardText />
+              <span className={`${montserrat_heading.variable} font-montserratHeading`}>
+                Docs
+              </span>
+            </span>
+          </Link>
+        </>
+
+        {auth.isAuthenticated ? (
+          <div style={{ all: 'unset' }}>
+            <div className={classes.link} style={{ display: 'flex', alignItems: 'center' }}>
+              <span className={`${montserrat_heading.variable} font-montserratHeading`}>
+                {auth.user?.profile.email}
+              </span>
+              <button
+                onClick={() => void auth.signoutRedirect()}
+                className={classes.link}
+                style={{ marginLeft: '10px' }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              const currentUrl = window.location.href;
+              void auth.signinRedirect({
+                state: JSON.stringify({ redirect: currentUrl })
+              });
+            }}
+            className={classes.link}
+          >
+            <span className={`${montserrat_heading.variable} font-montserratHeading`}>
+              Sign in / Sign up
+            </span>
+          </button>
+        )}
       </Group>
-    </header>
+    </header >
   )
 }
 
@@ -307,7 +383,7 @@ const useStyles = createStyles((theme) => ({
   link: {
     // textTransform: 'uppercase',
     fontSize: rem(13),
-    color: '#f1f5f9',
+    color: '#c1c2c5',
     padding: `${theme.spacing.sm} ${theme.spacing.xs}`,
     // margin: '0.35rem',
     fontWeight: 700,
@@ -328,6 +404,37 @@ const useStyles = createStyles((theme) => ({
       borderRadius: '10px', // added to make the square edges round when hovered
       backgroundColor: 'rgba(255, 255, 255, 0.1)', // add a background color when the link is active
       textAlign: 'right', // align the text to the right
+    },
+  },
+  userAvatar: {
+    cursor: 'pointer',
+    backgroundColor: 'hsl(280,100%,70%)',
+    color: 'white',
+    '&:hover': {
+      backgroundColor: 'hsl(280,100%,60%)',
+    },
+  },
+  avatarButton: {
+    cursor: 'pointer',
+    borderRadius: theme.radius.xl,
+    transition: 'background-color 100ms ease',
+    padding: rem(2),
+
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    }
+  },
+  userMenu: {
+    backgroundColor: '#15162c',
+    border: '1px solid hsl(280,100%,70%)',
+    color: '#f1f5f9',
+    padding: rem(4),
+    
+    '.mantine-Menu-item': {
+      padding: `${rem(8)} ${rem(12)}`,
+      '&:hover': {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      },
     },
   },
 }))

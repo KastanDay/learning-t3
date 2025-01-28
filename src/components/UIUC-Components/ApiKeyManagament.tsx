@@ -14,21 +14,25 @@ import {
 } from '@mantine/core'
 import { useClipboard, useMediaQuery } from '@mantine/hooks'
 import { showNotification } from '@mantine/notifications'
-import { type UserResource } from '@clerk/types'
+// import { type UserResource } from '@clerk/types'
 import { IconCheck, IconCopy, IconExternalLink } from '@tabler/icons-react'
 import { montserrat_heading } from 'fonts'
 import style from 'react-syntax-highlighter/dist/esm/styles/hljs/a11y-dark'
+import { AuthContextProps } from 'react-oidc-context'
 
+// NOTE: will need to map userID from clerk to id from KeyCloak
 const ApiKeyManagement = ({
   course_name,
-  clerk_user,
+  // clerk_user,
+  auth,
 }: {
   course_name: string
-  clerk_user: {
-    isLoaded: boolean
-    isSignedIn: boolean
-    user: UserResource | undefined
-  }
+  // clerk_user: {
+  //   isLoaded: boolean
+  //   isSignedIn: boolean
+  //   user: UserResource | undefined
+  // }
+  auth: AuthContextProps
 }) => {
   const theme = useMantineTheme()
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
@@ -167,9 +171,14 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
 
   useEffect(() => {
     const fetchApiKey = async () => {
+      if (!auth.isAuthenticated) {
+        setLoading(false)
+        return
+      }
       const response = await fetch(`/api/chat-api/keys/fetch`, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${auth.user?.access_token}`,
           'Content-Type': 'application/json',
         },
       })
@@ -188,12 +197,14 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     }
 
     fetchApiKey()
-  }, [clerk_user.isLoaded])
+  }, [auth.isAuthenticated])
+  // }, [clerk_user.isLoaded])
 
   const handleGenerate = async () => {
     const response = await fetch(`/api/chat-api/keys/generate`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${auth.user?.access_token}`,
         'Content-Type': 'application/json',
       },
     })
@@ -218,6 +229,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     const response = await fetch(`/api/chat-api/keys/rotate`, {
       method: 'PUT',
       headers: {
+        'Authorization': `Bearer ${auth.user?.access_token}`,
         'Content-Type': 'application/json',
       },
     })
@@ -242,6 +254,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     const response = await fetch(`/api/chat-api/keys/delete`, {
       method: 'DELETE',
       headers: {
+        'Authorization': `Bearer ${auth.user?.access_token}`,
         'Content-Type': 'application/json',
       },
     })
@@ -443,6 +456,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                   variant="unstyled"
                   wrapperProps={{ overflow: 'hidden' }}
                   className="relative w-[100%] min-w-[20rem] overflow-hidden rounded-b-xl border-t-2 border-gray-400 bg-[#0c0c27] pl-8 text-white"
+                  styles={{ input: { color: 'white' } }}
                   readOnly
                 />
               </div>

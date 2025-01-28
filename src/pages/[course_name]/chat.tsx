@@ -1,11 +1,12 @@
 // export { default } from '~/pages/api/home'
 
-import { useUser } from '@clerk/nextjs'
+// import { useUser } from '@clerk/nextjs'
+import { useAuth } from 'react-oidc-context'
 import { NextPage } from 'next'
 import { useEffect, useState } from 'react'
 import Home from '../api/home/home'
 import { useRouter } from 'next/router'
-import { extractEmailsFromClerk } from '~/components/UIUC-Components/clerkHelpers'
+// import { extractEmailsFromClerk } from '~/components/UIUC-Components/clerkHelpers'
 import { CourseMetadata } from '~/types/courseMetadata'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
@@ -15,8 +16,12 @@ import Head from 'next/head'
 import { GUIDED_LEARNING_PROMPT } from '~/utils/app/const'
 
 const ChatPage: NextPage = () => {
-  const clerk_user_outer = useUser()
-  const { user, isLoaded, isSignedIn } = clerk_user_outer
+  // const clerk_user_outer = useUser()
+  // const { user, isLoaded, isSignedIn } = clerk_user_outer
+  const auth = useAuth()
+  const user = auth.user
+  const isLoaded = !auth.isLoading
+  const isSignedIn = auth.isAuthenticated
   const router = useRouter()
   const curr_route_path = router.asPath as string
   const getCurrentPageName = () => {
@@ -36,6 +41,7 @@ const ChatPage: NextPage = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const guidedLearningParam = urlParams.get('guided_learning')
+    console.log('Guided learning param:', guidedLearningParam)
     setUrlGuidedLearning(guidedLearningParam === 'true')
   }, [router.query])
 
@@ -93,19 +99,28 @@ const ChatPage: NextPage = () => {
 
   // UseEffect to check user permissions and fetch user email
   useEffect(() => {
+    console.log('Checking user permissions. Auth loaded:', !auth.isLoading, 'Metadata loading:', isCourseMetadataLoading)
     if (!isLoaded || isCourseMetadataLoading) {
       return
     }
-    if (clerk_user_outer.isLoaded || isCourseMetadataLoading) {
+    // if (clerk_user_outer.isLoaded || isCourseMetadataLoading) {
       if (courseMetadata != null) {
+        // const permission_str = get_user_permission(
+        //   courseMetadata,
+        //   clerk_user_outer,
+        //   router,
+        // )
         const permission_str = get_user_permission(
           courseMetadata,
-          clerk_user_outer,
-          router,
+          auth,
         )
-
+        console.log('User permission:', permission_str)
+        if (auth.user?.profile.email) {
+          setCurrentEmail(auth.user.profile.email)
+        }
         if (permission_str == 'edit' || permission_str == 'view') {
         } else {
+          console.log('User not authorized, redirecting')
           router.replace(`/${courseName}/not_authorized`)
         }
       } else {
@@ -119,30 +134,30 @@ const ChatPage: NextPage = () => {
       // )
       // This will not work because setUserEmail is async
       // setUserEmail(extractEmailsFromClerk(clerk_user_outer.user)[0] as string)
-      const email = extractEmailsFromClerk(user)[0]
-      if (email) {
-        setCurrentEmail(email)
-        // console.log('setting user email: ', user)
-        // console.log('type of user: ', typeof user)
-      } else {
-        const key = process.env.NEXT_PUBLIC_POSTHOG_KEY as string
-        // console.log('key: ', key)
-        const postHogUserObj = localStorage.getItem('ph_' + key + '_posthog')
-        // console.log('posthog user obj: ', postHogUserObj)
-        if (postHogUserObj) {
-          const postHogUser = JSON.parse(postHogUserObj)
-          setCurrentEmail(postHogUser.distinct_id)
-          console.log(
-            'setting user email as posthog user: ',
-            postHogUser.distinct_id,
-          )
-        } else {
-          // When user is not logged in and posthog user is not found, what to do?
-          // This is where page will not load
-        }
-      }
-    }
-  }, [clerk_user_outer.isLoaded, isCourseMetadataLoading])
+      // const email = extractEmailsFromClerk(user)[0]
+      // if (email) {
+      //   setCurrentEmail(email)
+      //   // console.log('setting user email: ', user)
+      //   // console.log('type of user: ', typeof user)
+      // } else {
+      //   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY as string
+      //   // console.log('key: ', key)
+      //   const postHogUserObj = localStorage.getItem('ph_' + key + '_posthog')
+      //   // console.log('posthog user obj: ', postHogUserObj)
+      //   if (postHogUserObj) {
+      //     const postHogUser = JSON.parse(postHogUserObj)
+      //     setCurrentEmail(postHogUser.distinct_id)
+      //     console.log(
+      //       'setting user email as posthog user: ',
+      //       postHogUser.distinct_id,
+      //     )
+      //   } else {
+      //     // When user is not logged in and posthog user is not found, what to do?
+      //     // This is where page will not load
+      //   }
+      //}
+    //}
+  }, [auth.isLoading, isCourseMetadataLoading, auth.user, auth.isAuthenticated])
 
   return (
     <>
