@@ -16,6 +16,7 @@ import {
   IconVideo,
   IconPhoto,
   IconMusic,
+  IconWorld,
 } from '@tabler/icons-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -171,12 +172,12 @@ function UploadNotificationContent({
     return text.slice(0, maxLength) + '...'
   }
 
-  const getStatusMessage = (status: FileUpload['status'], url?: string) => {
-    if (url) return truncateText(url, 35)
+  const getStatusMessage = (status: FileUpload['status'], url?: string, type?: string) => {
+    // if (url) return truncateText(url, 35)
 
     switch (status) {
       case 'uploading':
-        return 'Uploading to secure storage...'
+        return type === 'webscrape' ? 'Web crawling...' : 'Uploading to secure storage...'
       case 'ingesting':
         return 'Processing for chat...'
       case 'complete':
@@ -216,7 +217,7 @@ function UploadNotificationContent({
             component="pre"
           >
             {currentFiles.some((file) => file.status === 'error')
-              ? "If it doesn't work, please try again and let us know!"
+              ? "If upload failed, please try again and let us know!"
               : currentFiles.some((file) => file.status === 'uploading')
                 ? 'Please stay on this page while files are uploading'
                 : currentFiles.some((file) => file.status === 'ingesting')
@@ -264,7 +265,7 @@ function UploadNotificationContent({
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center">
-                    {file.name ? getFileIcon(file.name.split('.').pop() || '') : getFileIcon('')}
+                    {file.type === 'webscrape' ? <IconWorld size={18} /> : file.name ? getFileIcon(file.name.split('.').pop() || '') : getFileIcon('')}
                   </div>
                   <div className="min-w-0 flex-1">
                     <Text
@@ -277,9 +278,9 @@ function UploadNotificationContent({
                     <Text
                       size="xs"
                       className={`truncate text-[#8e8eb2] ${montserrat_paragraph.variable} font-montserratParagraph`}
-                      title={file.url || getStatusMessage(file.status)}
+                      title={getStatusMessage(file.status)}
                     >
-                      {getStatusMessage(file.status, file.url)}
+                      {getStatusMessage(file.status, file.url, file.type)}
                     </Text>
                   </div>
                   <div className="ml-2 flex items-center">

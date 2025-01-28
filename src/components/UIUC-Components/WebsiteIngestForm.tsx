@@ -134,6 +134,7 @@ export default function WebsiteIngestForm({
         name: url,
         status: 'uploading',
         type: 'webscrape',
+        url: url
       }
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
 
@@ -250,20 +251,21 @@ export default function WebsiteIngestForm({
       const createAdditionalFileEntries = (
         baseUrlMap: Map<string, Set<string>>,
         currentFiles: FileUpload[],
-        docsInProgress: Array<{ base_url: string }>,
+        docsInProgress: Array<{ base_url: string, readable_filename: string }>,
       ) => {
         const newFiles: FileUpload[] = [];
 
         baseUrlMap.forEach((urls, baseUrl) => {
           // Only process if we have this base URL in our current files
           if (currentFiles.some(file => file.name === baseUrl)) {
-            const isStillIngesting = docsInProgress.some(
+            const matchingDoc = docsInProgress.find(
               doc => doc.base_url === baseUrl
             );
 
+            const isStillIngesting = matchingDoc !== undefined;
+
             urls.forEach(url => {
-              // Don't add if URL already exists in current files
-              if (!currentFiles.some(file => file.name === url)) {
+              if (!currentFiles.some(file => file.url === url) && matchingDoc) {
                 newFiles.push({
                   name: url,
                   status: isStillIngesting ? 'ingesting' : 'complete',
@@ -279,30 +281,25 @@ export default function WebsiteIngestForm({
       };
 
       setUploadFiles((prev) => {
-        // Get matching docs from docsInProgress
         const matchingDocsInProgress = data?.documents?.filter(
           (doc: { base_url: string }) =>
             prev.some(file => file.name === doc.base_url)
         ) || [];
 
-        // Organize docs by base URL
         const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress);
 
-        // Create new file entries for additional URLs
         const additionalFiles = createAdditionalFileEntries(
           baseUrlMap,
           prev,
           matchingDocsInProgress
         );
 
-        // Update existing files
         const updatedExistingFiles = updateExistingFiles(
           prev,
           matchingDocsInProgress
         );
 
 
-        // Combine existing and new files
         return [...updatedExistingFiles, ...additionalFiles];
       });
     };

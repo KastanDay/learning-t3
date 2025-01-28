@@ -234,36 +234,97 @@ export default function GitHubIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
-      setUploadFiles((prev) => {
-        const currentBaseUrls = new Set(prev.map((file) => file.name));
+      console.log('current docs in progress files', data.documents)
+      // Helper function to organize docs by base URL
+      const organizeDocsByBaseUrl = (docs: Array<{ base_url: string; url: string }>) => {
+        const baseUrlMap = new Map<string, Set<string>>();
 
-        // Add new files from the fetched data if they have the same base_url as any existing file's base_url
-        const newFiles = data?.documents
-          ?.filter((doc: { base_url: string }) =>
-            !currentBaseUrls.has(doc.base_url) &&
-            prev.some((file) => file.name === doc.base_url)
-          )
-          .map((doc: { base_url: string, url: string }) => ({
-            name: doc.url,
-            status: 'ingesting' as const,
-          })) || [];
+        docs.forEach((doc) => {
+          if (!baseUrlMap.has(doc.base_url)) {
+            baseUrlMap.set(doc.base_url, new Set());
+          }
+          baseUrlMap.get(doc.base_url)?.add(doc.url);
+        });
+        console.log('current map of base url', baseUrlMap)
 
-        // Update existing files and add new files
-        const updatedFiles = prev.map((file) => {
-          const isIngesting = data?.documents?.some(
-            (doc: { url: string }) => doc.url === file.name
+        return baseUrlMap;
+      };
+
+      // Helper function to update status of existing files
+      const updateExistingFiles = (
+        currentFiles: FileUpload[],
+        docsInProgress: Array<{ base_url: string }>,
+      ) => {
+        return currentFiles.map((file) => {
+          const isStillIngesting = docsInProgress.some(
+            (doc) => doc.base_url === file.name
           );
-          if (file.status === 'uploading' && isIngesting) {
+
+          if (file.status === 'uploading' && isStillIngesting) {
             return { ...file, status: 'ingesting' as const };
-          } else if (file.status === 'ingesting' && !isIngesting) {
+          } else if (file.status === 'ingesting' && !isStillIngesting) {
             return { ...file, status: 'complete' as const };
           }
           return file;
         });
+      };
 
-        return [...updatedFiles, ...newFiles];
+      // Helper function to create new file entries for additional URLs
+      const createAdditionalFileEntries = (
+        baseUrlMap: Map<string, Set<string>>,
+        currentFiles: FileUpload[],
+        docsInProgress: Array<{ base_url: string, readable_filename: string }>,
+      ) => {
+        const newFiles: FileUpload[] = [];
+
+        baseUrlMap.forEach((urls, baseUrl) => {
+          // Only process if we have this base URL in our current files
+          if (currentFiles.some(file => file.name === baseUrl)) {
+            const matchingDoc = docsInProgress.find(
+              doc => doc.base_url === baseUrl
+            );
+
+            const isStillIngesting = matchingDoc !== undefined;
+
+            urls.forEach(url => {
+              if (!currentFiles.some(file => file.url === url) && matchingDoc) {
+                newFiles.push({
+                  name: url,
+                  status: isStillIngesting ? 'ingesting' : 'complete',
+                  type: 'webscrape',
+                  url: url
+                });
+              }
+            });
+          }
+        });
+
+        return newFiles;
+      };
+
+      setUploadFiles((prev) => {
+        const matchingDocsInProgress = data?.documents?.filter(
+          (doc: { base_url: string }) =>
+            prev.some(file => file.name === doc.base_url)
+        ) || [];
+
+        const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress);
+
+        const additionalFiles = createAdditionalFileEntries(
+          baseUrlMap,
+          prev,
+          matchingDocsInProgress
+        );
+
+        const updatedExistingFiles = updateExistingFiles(
+          prev,
+          matchingDocsInProgress
+        );
+
+        return [...updatedExistingFiles, ...additionalFiles];
       });
-    }
+    };
+
     const interval = setInterval(checkIngestStatus, 3000)
     return () => {
       clearInterval(interval)
@@ -299,7 +360,7 @@ export default function GitHubIngestForm({
       )
 
       const response = await axios.post(
-        `https://crawlee-production.up.railway.app/crawl`,
+        `https://crawlee-supabse-docs-in-progress.up.railway.app/crawl`,
         {
           params: postParams,
         },
