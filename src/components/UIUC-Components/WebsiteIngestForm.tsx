@@ -196,6 +196,7 @@ export default function WebsiteIngestForm({
       matchRegex: matchRegex,
     }
   }
+
   useEffect(() => {
     if (url && url.length > 0 && validateUrl(url)) {
       setIsUrlUpdated(true)
@@ -210,43 +211,102 @@ export default function WebsiteIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
-      console.log('files in docsInProgress', data)
+      console.log('current docs in progress files', data.documents)
+      // Helper function to organize docs by base URL
+      const organizeDocsByBaseUrl = (docs: Array<{ base_url: string; url: string }>) => {
+        const baseUrlMap = new Map<string, Set<string>>();
 
-      setUploadFiles((prev) => {
-        const currentBaseUrls = new Set(prev.map((file) => file.name));
+        docs.forEach((doc) => {
+          if (!baseUrlMap.has(doc.base_url)) {
+            baseUrlMap.set(doc.base_url, new Set());
+          }
+          baseUrlMap.get(doc.base_url)?.add(doc.url);
+        });
+        console.log('current map of base url', baseUrlMap)
 
-        // Add new files from the fetched data if they have the same base_url as any existing file's base_url
-        const newFiles = data?.documents
-          ?.filter((doc: { base_url: string }) =>
-            !currentBaseUrls.has(doc.base_url) &&
-            prev.some((file) => file.name === doc.base_url)
-          )
-          .map((doc: { base_url: string, url: string }) => ({
-            name: doc.url,
-            // url: doc.url,
-            status: 'ingesting' as const,
-          })) || [];
-        console.log('files in docsInProgress after adding new urls', newFiles)
-        // Update existing files and add new files
-        const updatedFiles = prev.map((file) => {
-          const isIngesting = data?.documents?.some(
-            (doc: { url: string }) => doc.url === file.name
+        return baseUrlMap;
+      };
+
+      // Helper function to update status of existing files
+      const updateExistingFiles = (
+        currentFiles: FileUpload[],
+        docsInProgress: Array<{ base_url: string }>,
+      ) => {
+        return currentFiles.map((file) => {
+          const isStillIngesting = docsInProgress.some(
+            (doc) => doc.base_url === file.name
           );
-          console.log('isIngesting in the docs in progress table', isIngesting)
-          console.log('Current upload files status:', prev.map(file => file.status))
-          if (file.status === 'uploading' && isIngesting) {
+
+          if (file.status === 'uploading' && isStillIngesting) {
             return { ...file, status: 'ingesting' as const };
-          } else if (file.status === 'ingesting' && !isIngesting) {
+          } else if (file.status === 'ingesting' && !isStillIngesting) {
             return { ...file, status: 'complete' as const };
           }
           return file;
         });
+      };
 
-        return [...updatedFiles, ...newFiles];
+      // Helper function to create new file entries for additional URLs
+      const createAdditionalFileEntries = (
+        baseUrlMap: Map<string, Set<string>>,
+        currentFiles: FileUpload[],
+        docsInProgress: Array<{ base_url: string }>,
+      ) => {
+        const newFiles: FileUpload[] = [];
+
+        baseUrlMap.forEach((urls, baseUrl) => {
+          // Only process if we have this base URL in our current files
+          if (currentFiles.some(file => file.name === baseUrl)) {
+            const isStillIngesting = docsInProgress.some(
+              doc => doc.base_url === baseUrl
+            );
+
+            urls.forEach(url => {
+              // Don't add if URL already exists in current files
+              if (!currentFiles.some(file => file.name === url)) {
+                newFiles.push({
+                  name: url,
+                  status: isStillIngesting ? 'ingesting' : 'complete',
+                  type: 'webscrape',
+                  url: url
+                });
+              }
+            });
+          }
+        });
+
+        return newFiles;
+      };
+
+      setUploadFiles((prev) => {
+        // Get matching docs from docsInProgress
+        const matchingDocsInProgress = data?.documents?.filter(
+          (doc: { base_url: string }) =>
+            prev.some(file => file.name === doc.base_url)
+        ) || [];
+
+        // Organize docs by base URL
+        const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress);
+
+        // Create new file entries for additional URLs
+        const additionalFiles = createAdditionalFileEntries(
+          baseUrlMap,
+          prev,
+          matchingDocsInProgress
+        );
+
+        // Update existing files
+        const updatedExistingFiles = updateExistingFiles(
+          prev,
+          matchingDocsInProgress
+        );
+
+
+        // Combine existing and new files
+        return [...updatedExistingFiles, ...additionalFiles];
       });
-      const ingestingFile =
-        console.log("")
-    }
+    };
+
     const interval = setInterval(checkIngestStatus, 3000)
     return () => {
       clearInterval(interval)
@@ -279,7 +339,7 @@ export default function WebsiteIngestForm({
       )
 
       const response = await axios.post(
-        `https://crawlee-production.up.railway.app/crawl`,
+        `https://crawlee-supabse-docs-in-progress.up.railway.app/crawl`,
         {
           params: postParams,
         },

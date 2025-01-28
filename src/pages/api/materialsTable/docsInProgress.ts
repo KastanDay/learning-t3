@@ -24,11 +24,10 @@ export default async function docsInProgress(
   if (!currUserId) {
     return res.status(401).json({ error: 'User ID is required' })
   }
-
   try {
     const { data, error } = await supabase
       .from('documents_in_progress')
-      .select('readable_filename')
+      .select('readable_filename, base_url, url')
       .eq('course_name', course_name)
 
     if (error) {

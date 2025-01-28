@@ -252,6 +252,7 @@ export function LargeDropzone({
       const data = await response.json()
       if (data.documents.length > 0) {
         console.debug('ingest is currently active: ', data.documents)
+        console.log()
       }
 
       setUploadFiles((prev) => {
@@ -285,7 +286,7 @@ export function LargeDropzone({
       console.log('Cleaning up ingest status check interval')
       clearInterval(interval)
     }
-  }, [courseName]) // Only depend on courseName
+  }, [courseName])
 
   return (
     <>

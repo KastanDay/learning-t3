@@ -264,7 +264,7 @@ function UploadNotificationContent({
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center">
-                    {getFileIcon(file.name.split('.').pop() || '')}
+                    {file.name ? getFileIcon(file.name.split('.').pop() || '') : getFileIcon('')}
                   </div>
                   <div className="min-w-0 flex-1">
                     <Text
@@ -272,7 +272,7 @@ function UploadNotificationContent({
                       className={`truncate font-medium text-white ${montserrat_paragraph.variable} font-montserratParagraph`}
                       title={file.name}
                     >
-                      {truncateText(file.name, 30)}
+                      {file.name ? truncateText(file.name, 30) : file.name}
                     </Text>
                     <Text
                       size="xs"
