@@ -148,7 +148,7 @@ export function ProjectFilesTable({
     error: documentsError,
     refetch: refetchDocuments,
   } = useQuery({
-    refetchInterval: 10_000,
+    refetchInterval: 3_000,
     queryKey: [
       'documents',
       course_name,

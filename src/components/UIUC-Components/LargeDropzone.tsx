@@ -280,10 +280,8 @@ export function LargeDropzone({
       })
     }
 
-    console.log('Setting up ingest status check interval')
-    const interval = setInterval(checkIngestStatus, 3000)
+    const interval = setInterval(checkIngestStatus, 1500)
     return () => {
-      console.log('Cleaning up ingest status check interval')
       clearInterval(interval)
     }
   }, [courseName])
