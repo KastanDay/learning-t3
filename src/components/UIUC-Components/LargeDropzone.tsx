@@ -289,7 +289,7 @@ export function LargeDropzone({
       })
     }
 
-    let intervalId = setInterval(checkIngestStatus, pollInterval);
+    const intervalId = setInterval(checkIngestStatus, pollInterval);
 
     return () => {
       clearInterval(intervalId);
