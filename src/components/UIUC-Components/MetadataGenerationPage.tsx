@@ -9,12 +9,21 @@ import {
   Alert,
   Group,
   Table,
+  Modal,
+  CopyButton,
+  Button,
 } from '@mantine/core'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useMediaQuery } from '@mantine/hooks'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useState } from 'react'
-import { IconDownload, IconRefresh, IconAlertCircle } from '@tabler/icons-react'
+import {
+  IconDownload,
+  IconRefresh,
+  IconAlertCircle,
+  IconCopy,
+  IconCheck,
+} from '@tabler/icons-react'
 import {
   useQuery,
   useMutation,
@@ -32,10 +41,10 @@ import {
   type MetadataField,
 } from '~/utils/apiUtils'
 import { MetadataResultsTable } from './MetadataResultsTable'
-import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { MultiSelect } from './ui/multi-select'
 import { cn } from '~/lib/utils'
+import { MetadataTable, columns } from './ui/metadata-table'
 
 // Types for metadata generation
 interface MetadataRun {
@@ -60,6 +69,67 @@ async function getMetadataHistory(courseName: string): Promise<MetadataRun[]> {
   return data.history || []
 }
 
+// Add new types and components
+interface JsonDialogProps {
+  opened: boolean
+  onClose: () => void
+  jsonData: any
+}
+
+function JsonDialog({ opened, onClose, jsonData }: JsonDialogProps) {
+  const formattedJson = JSON.stringify(jsonData, null, 2)
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="JSON Data"
+      size="lg"
+      styles={{
+        title: {
+          color: 'white',
+          fontFamily: montserrat_heading.variable,
+        },
+        body: {
+          backgroundColor: '#1e1f3a',
+        },
+        header: {
+          backgroundColor: '#1e1f3a',
+        },
+        close: {
+          color: 'white',
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        },
+      }}
+    >
+      <div className="relative">
+        <pre className="max-h-[70vh] overflow-auto rounded-lg bg-[#15162b] p-4 text-sm text-white/90">
+          {formattedJson}
+        </pre>
+        <div className="absolute right-2 top-2">
+          <CopyButton value={formattedJson} timeout={2000}>
+            {({ copied, copy }) => (
+              <Button
+                color={copied ? 'teal' : 'grape'}
+                onClick={copy}
+                size="xs"
+                variant="light"
+                leftIcon={
+                  copied ? <IconCheck size={16} /> : <IconCopy size={16} />
+                }
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </Button>
+            )}
+          </CopyButton>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function MetadataGenerationPage({
   course_name,
   metadata,
@@ -74,6 +144,7 @@ export default function MetadataGenerationPage({
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [selectedHistoryRun, setSelectedHistoryRun] =
     useState<MetadataRun | null>(null)
+  const [jsonDialogData, setJsonDialogData] = useState<any>(null)
 
   // Query for available documents
   const { data: documents = [], isLoading: isLoadingDocuments } = useQuery({
@@ -216,33 +287,40 @@ export default function MetadataGenerationPage({
     if (value === null || value === undefined) return '-'
     if (typeof value === 'object') {
       return (
-        <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-xs">
-          {JSON.stringify(value, null, 2)}
-        </pre>
+        <div
+          className="cursor-pointer text-white/90 hover:text-white"
+          onClick={() => setJsonDialogData(value)}
+        >
+          <div className="flex items-center gap-1">
+            <span>View JSON</span>
+            <IconCopy size={14} className="text-white/60" />
+          </div>
+        </div>
       )
     }
     return String(value)
   }
 
   return (
-    <div className="flex w-full flex-col items-center gap-6">
+    // <div className="flex w-full flex-col items-center gap-6">
+    <>
       <Card
         shadow="xs"
         padding="none"
         radius="xl"
-        className="w-[96%] md:w-[90%] 2xl:w-[90%]"
+        className="mt-[2%] w-[96%] md:w-[90%] 2xl:w-[90%]"
       >
         <Flex direction={isSmallScreen ? 'column' : 'row'}>
           {/* Left Panel - Main Content */}
           <div
             style={{
-              flex: isSmallScreen ? '1 1 100%' : '1 1 60%',
+              flex: isSmallScreen ? '1 1 100%' : '1 1 95%',
               border: 'None',
               color: 'white',
             }}
-            className="min-h-full rounded-l-xl bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-800"
+            className="min-h-full bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-800"
           >
-            <div className="w-full rounded-tl-xl border-b border-white/10 bg-black/20 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
+            <div className="w-full border-b border-white/10 bg-black/20 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Title
@@ -379,7 +457,8 @@ export default function MetadataGenerationPage({
                         'cursor-pointer rounded-lg bg-black/20 p-4 transition-colors hover:bg-black/30',
                         selectedHistoryRun?.run_id === run.run_id &&
                           !currentRunId &&
-                          'ring-1 ring-indigo-500',
+                          'bg-purple-800',
+                        'hover:bg-indigo-600',
                         currentRunId && 'cursor-not-allowed opacity-50',
                       )}
                       padding="sm"
@@ -451,123 +530,88 @@ export default function MetadataGenerationPage({
       {/* Results Table */}
       {((currentRunId && isAllCompleted && !hasError) ||
         selectedHistoryRun) && (
-        <Card className="mb-6 w-[96%] rounded-xl bg-black/20 p-6 md:w-[90%] 2xl:w-[90%]">
-          <div className="mb-4 flex items-center justify-between">
-            <Title
-              order={4}
-              className={`${montserrat_heading.variable} font-montserratHeading text-white/90`}
-            >
-              {currentRunId
-                ? 'Generated Metadata'
-                : `Run #${selectedHistoryRun!.run_id} Metadata`}
-            </Title>
+        <Card
+          shadow="xs"
+          padding="none"
+          radius="xl"
+          className="mt-[2%] w-[96%] md:w-[90%] 2xl:w-[90%]"
+        >
+          <div
+            style={{
+              color: 'white',
+            }}
+            className="min-h-full bg-gradient-to-r from-purple-900 via-indigo-800 to-blue-800"
+          >
+            <div className="w-full border-b border-white/10 bg-black/20 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
+              <div className="flex items-center justify-between">
+                <Title
+                  order={3}
+                  className={`${montserrat_heading.variable} font-montserratHeading text-lg text-white/90 sm:text-2xl`}
+                >
+                  {currentRunId
+                    ? 'Run #4 Metadata'
+                    : `Run #${selectedHistoryRun!.run_id} Metadata`}
+                </Title>
 
-            {((currentRunId && isAllCompleted && !hasError) ||
-              selectedHistoryRun?.status === 'completed') && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  console.log(
-                    'Downloading CSV for run ID:',
-                    currentRunId || selectedHistoryRun?.run_id,
-                  )
-                  downloadCSV()
-                }}
-                className="relative transform border-white/10 bg-transparent text-white transition-all hover:bg-white/10 disabled:opacity-50"
-                disabled={isDownloading}
-              >
-                {isDownloading ? (
-                  <div className="flex items-center gap-2">
-                    <IconDownload className="h-4 w-4 animate-spin" />
-                    Exporting...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <IconDownload className="h-4 w-4" />
+                {((currentRunId && isAllCompleted && !hasError) ||
+                  selectedHistoryRun?.status === 'completed') && (
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => downloadCSV()}
+                    className="rounded-md bg-purple-800 text-white hover:bg-indigo-600"
+                    disabled={isDownloading}
+                    leftIcon={<IconDownload className="h-4 w-4" />}
+                  >
                     Export CSV
-                  </div>
+                  </Button>
                 )}
-              </Button>
-            )}
-          </div>
+              </div>
+            </div>
 
-          {isLoadingCurrentMetadata || isLoadingHistoryMetadata ? (
-            <div className="flex h-32 items-center justify-center">
-              <Text color="dimmed">Loading metadata...</Text>
+            <div className="bg-[#1e1f3a]/80 px-4 py-4 sm:px-6 sm:py-6 md:px-8">
+              {isLoadingCurrentMetadata || isLoadingHistoryMetadata ? (
+                <div className="flex h-32 items-center justify-center rounded-xl bg-[#15162c] text-white/60">
+                  <Text>Loading metadata...</Text>
+                </div>
+              ) : (currentRunId ? currentMetadata : historyMetadata).length ===
+                0 ? (
+                <div className="flex h-32 items-center justify-center rounded-xl bg-[#15162c] text-white/60">
+                  <Text>No metadata available</Text>
+                </div>
+              ) : (
+                <ScrollArea.Autosize
+                  mah="calc(80vh - 16rem)"
+                  type="always"
+                  offsetScrollbars
+                  className="overflow-hidden rounded-xl"
+                >
+                  <MetadataTable
+                    columns={columns}
+                    data={(currentRunId
+                      ? currentMetadata
+                      : historyMetadata
+                    ).map((field) => ({
+                      ...field,
+                      document_name:
+                        documentNames[field.document_id] ||
+                        `Document ${field.document_id}`,
+                    }))}
+                    onViewJson={setJsonDialogData}
+                  />
+                </ScrollArea.Autosize>
+              )}
             </div>
-          ) : (currentRunId ? currentMetadata : historyMetadata).length ===
-            0 ? (
-            <div className="flex h-32 items-center justify-center">
-              <Text color="dimmed">No metadata available</Text>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* Debug log */}
-              {(() => {
-                console.log(
-                  'Rendering metadata table with data:',
-                  currentRunId ? currentMetadata : historyMetadata,
-                )
-                return null
-              })()}
-              <Table className="w-full">
-                <thead>
-                  <tr>
-                    <th className="border-b border-white/10 px-4 py-2 text-left text-sm font-semibold text-white/90">
-                      Document
-                    </th>
-                    <th className="border-b border-white/10 px-4 py-2 text-left text-sm font-semibold text-white/90">
-                      Field
-                    </th>
-                    <th className="border-b border-white/10 px-4 py-2 text-left text-sm font-semibold text-white/90">
-                      Value
-                    </th>
-                    <th className="border-b border-white/10 px-4 py-2 text-left text-sm font-semibold text-white/90">
-                      Confidence
-                    </th>
-                    <th className="border-b border-white/10 px-4 py-2 text-left text-sm font-semibold text-white/90">
-                      Method
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(currentRunId ? currentMetadata : historyMetadata).map(
-                    (field, index) => {
-                      console.log('Rendering field:', field)
-                      return (
-                        <tr
-                          key={index}
-                          className="border-b border-white/10 last:border-0"
-                        >
-                          <td className="px-4 py-2 text-sm text-white/80">
-                            {documentNames[field.document_id] ||
-                              `Document ${field.document_id}`}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-white/80">
-                            {field.field_name}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-white/80">
-                            {renderMetadataValue(field.field_value)}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-white/80">
-                            {field.confidence_score !== null
-                              ? `${Math.round(field.confidence_score * 100)}%`
-                              : '-'}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-white/80">
-                            {field.extraction_method || '-'}
-                          </td>
-                        </tr>
-                      )
-                    },
-                  )}
-                </tbody>
-              </Table>
-            </div>
-          )}
+          </div>
         </Card>
       )}
-    </div>
+
+      {/* JSON Dialog */}
+      <JsonDialog
+        opened={jsonDialogData !== null}
+        onClose={() => setJsonDialogData(null)}
+        jsonData={jsonDialogData}
+      />
+    </>
   )
 }
