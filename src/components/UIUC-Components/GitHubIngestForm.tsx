@@ -234,7 +234,6 @@ export default function GitHubIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
-      // console.log('current docs in progress files', data.documents)
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (docs: Array<{ base_url: string; url: string }>) => {
         const baseUrlMap = new Map<string, Set<string>>();
@@ -245,7 +244,6 @@ export default function GitHubIngestForm({
           }
           baseUrlMap.get(doc.base_url)?.add(doc.url);
         });
-        console.log('current map of base url', baseUrlMap)
 
         return baseUrlMap;
       };

@@ -241,18 +241,27 @@ export function LargeDropzone({
     }
   }
 
-  // Add useEffect to check ingest status
   useEffect(() => {
-    const checkIngestStatus = async () => {
+    let pollInterval = 3000; // Start with a slower interval
+    const MIN_INTERVAL = 1000; // Fast polling when active
+    const MAX_INTERVAL = 5000; // Slow polling when inactive
+    let consecutiveEmptyPolls = 0;
 
-      console.debug('Checking for ingest in progress...')
+    const checkIngestStatus = async () => {
       const response = await fetch(
         `/api/materialsTable/docsInProgress?course_name=${courseName}`,
       )
       const data = await response.json()
+
+      // Adjust polling interval based on activity
       if (data.documents.length > 0) {
-        console.debug('ingest is currently active: ', data.documents)
-        console.log()
+        pollInterval = MIN_INTERVAL;
+        consecutiveEmptyPolls = 0;
+      } else {
+        consecutiveEmptyPolls++;
+        if (consecutiveEmptyPolls >= 3) { // After 3 empty polls, slow down
+          pollInterval = Math.min(pollInterval * 1.5, MAX_INTERVAL);
+        }
       }
 
       setUploadFiles((prev) => {
@@ -280,9 +289,10 @@ export function LargeDropzone({
       })
     }
 
-    const interval = setInterval(checkIngestStatus, 1500)
+    let intervalId = setInterval(checkIngestStatus, pollInterval);
+
     return () => {
-      clearInterval(interval)
+      clearInterval(intervalId);
     }
   }, [courseName])
 
