@@ -253,6 +253,8 @@ export function LargeDropzone({
       )
       const data = await response.json()
 
+      const docsResponse = await fetch(`/api/materialsTable/docs?course_name=${courseName}`)
+      const docsData = await docsResponse.json()
       // Adjust polling interval based on activity
       if (data.documents.length > 0) {
         pollInterval = MIN_INTERVAL;
@@ -266,6 +268,8 @@ export function LargeDropzone({
 
       setUploadFiles((prev) => {
         return prev.map((file) => {
+          if (file.type !== 'document') return file;
+
           if (file.status === 'uploading') {
             const isIngesting = data?.documents?.some(
               (doc: { readable_filename: string }) =>
@@ -280,8 +284,12 @@ export function LargeDropzone({
               (doc: { readable_filename: string }) =>
                 doc.readable_filename === file.name,
             )
+
             if (!isStillIngesting) {
-              return { ...file, status: 'complete' as const }
+              const isInCompletedDocs = docsData?.documents?.some(
+                (doc: { readable_filename: string }) => doc.readable_filename === file.name
+              )
+              return { ...file, status: isInCompletedDocs ? 'complete' as const : 'error' as const }
             }
           }
           return file

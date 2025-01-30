@@ -101,7 +101,6 @@ function UploadNotificationContent({
             return file
           })
         }
-
         return updatedFiles
       })
     }
@@ -177,7 +176,7 @@ function UploadNotificationContent({
 
     switch (status) {
       case 'uploading':
-        return type === 'webscrape' ? 'Web crawling...' : 'Uploading to secure storage...'
+        return type === 'webscrape' || type === 'github' ? 'Web crawling...' : 'Uploading to secure storage...'
       case 'ingesting':
         return 'Processing for chat...'
       case 'complete':

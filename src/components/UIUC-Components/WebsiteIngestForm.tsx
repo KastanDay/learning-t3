@@ -146,20 +146,6 @@ export default function WebsiteIngestForm({
           scrapeStrategy,
         )
 
-        if (
-          response &&
-          typeof response === 'string' &&
-          response.includes('Crawl completed successfully')
-        ) {
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'complete' } : file,
-            ),
-          )
-          await queryClient.invalidateQueries({
-            queryKey: ['documents', project_name],
-          })
-        }
       } catch (error: unknown) {
         console.error('Error while scraping web:', error)
         setUploadFiles((prevFiles) =>
@@ -212,6 +198,8 @@ export default function WebsiteIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
+      const docsResponse = await fetch(`/api/materialsTable/docs?course_name=${project_name}`)
+      const docsData = await docsResponse.json()
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (docs: Array<{ base_url: string; url: string }>) => {
         const baseUrlMap = new Map<string, Set<string>>();
@@ -231,15 +219,30 @@ export default function WebsiteIngestForm({
         currentFiles: FileUpload[],
         docsInProgress: Array<{ base_url: string }>,
       ) => {
+
         return currentFiles.map((file) => {
+          if (file.type !== 'webscrape') return file;
+
           const isStillIngesting = docsInProgress.some(
             (doc) => doc.base_url === file.name
           );
 
           if (file.status === 'uploading' && isStillIngesting) {
             return { ...file, status: 'ingesting' as const };
-          } else if (file.status === 'ingesting' && !isStillIngesting) {
-            return { ...file, status: 'complete' as const };
+          } else if (file.status === 'ingesting') {
+            if (!isStillIngesting) {
+              const isInCompletedDocs = docsData?.documents?.some(
+                (doc: { url: string }) => doc.url === file.url
+              );
+
+              if (isInCompletedDocs) {
+                return { ...file, status: 'complete' as const };
+              }
+
+              // If not in completed docs, keep as 'ingesting' 
+              // The crawling might still be in progress even if not in docsInProgress
+              return file;
+            }
           }
           return file;
         });
@@ -292,13 +295,13 @@ export default function WebsiteIngestForm({
           matchingDocsInProgress
         );
 
-        const updatedExistingFiles = updateExistingFiles(
-          prev,
-          matchingDocsInProgress
-        );
+        const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress);
 
+        return [...updatedFiles, ...additionalFiles];
+      });
 
-        return [...updatedExistingFiles, ...additionalFiles];
+      await queryClient.invalidateQueries({
+        queryKey: ['documents', project_name],
       });
     };
 

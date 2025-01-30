@@ -162,20 +162,6 @@ export default function GitHubIngestForm({
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
           scrapeStrategy,
         )
-        if (
-          response &&
-          typeof response === 'string' &&
-          response.includes('Crawl completed successfully')
-        ) {
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'complete' } : file,
-            ),
-          )
-          await queryClient.invalidateQueries({
-            queryKey: ['documents', project_name],
-          })
-        }
       } catch (error: any) {
         console.error('Error while scraping web:', error)
         setUploadFiles((prevFiles) =>
@@ -220,6 +206,7 @@ export default function GitHubIngestForm({
       matchRegex: matchRegex,
     }
   }
+
   useEffect(() => {
     if (url && url.length > 0 && validateUrl(url)) {
       setIsUrlUpdated(true)
@@ -234,6 +221,9 @@ export default function GitHubIngestForm({
         `/api/materialsTable/docsInProgress?course_name=${project_name}`,
       )
       const data = await response.json();
+      const docsResponse = await fetch(`/api/materialsTable/docs?course_name=${project_name}`)
+      const docsData = await docsResponse.json()
+
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (docs: Array<{ base_url: string; url: string }>) => {
         const baseUrlMap = new Map<string, Set<string>>();
@@ -254,14 +244,26 @@ export default function GitHubIngestForm({
         docsInProgress: Array<{ base_url: string }>,
       ) => {
         return currentFiles.map((file) => {
+          if (file.type !== 'github') return file;
+
           const isStillIngesting = docsInProgress.some(
             (doc) => doc.base_url === file.name
           );
 
           if (file.status === 'uploading' && isStillIngesting) {
             return { ...file, status: 'ingesting' as const };
-          } else if (file.status === 'ingesting' && !isStillIngesting) {
-            return { ...file, status: 'complete' as const };
+          } else if (file.status === 'ingesting') {
+            if (!isStillIngesting) {
+              const isInCompletedDocs = docsData?.documents?.some(
+                (doc: { url: string }) => doc.url === file.url
+              );
+
+              if (isInCompletedDocs) {
+                return { ...file, status: 'complete' as const };
+              }
+
+              return file;
+            }
           }
           return file;
         });
@@ -289,7 +291,7 @@ export default function GitHubIngestForm({
                 newFiles.push({
                   name: url,
                   status: isStillIngesting ? 'ingesting' : 'complete',
-                  type: 'webscrape',
+                  type: 'github',
                   url: url
                 });
               }
@@ -314,12 +316,13 @@ export default function GitHubIngestForm({
           matchingDocsInProgress
         );
 
-        const updatedExistingFiles = updateExistingFiles(
-          prev,
-          matchingDocsInProgress
-        );
+        const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress);
 
-        return [...updatedExistingFiles, ...additionalFiles];
+        return [...updatedFiles, ...additionalFiles];
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ['documents', project_name],
       });
     };
 
