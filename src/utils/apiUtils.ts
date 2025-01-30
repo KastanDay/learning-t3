@@ -137,9 +137,9 @@ export async function fetchPresignedUrl(
  */
 export async function fetchCourseMetadata(course_name: string): Promise<any> {
   try {
-    console.log("Vercel base URL", process.env.VERCEL_URL)
+    console.log('Vercel base URL', process.env.VERCEL_URL)
     const endpoint = `${getBaseUrl()}/api/UIUC-api/getCourseMetadata?course_name=${course_name}`
-    console.log("endpoint url of metadata:", endpoint)
+    console.log('endpoint url of metadata:', endpoint)
     const response = await fetch(endpoint)
 
     if (!response.ok) {
@@ -281,10 +281,150 @@ interface PresignedPostResponse {
   }
 }
 
+// Types for metadata generation
+export interface MetadataGenerationResponse {
+  run_id: number
+  status: 'started' | 'completed' | 'failed'
+  error?: string
+}
+
+export interface DocumentStatus {
+  document_id: number
+  run_status: 'in_progress' | 'completed' | 'failed'
+  last_error?: string
+}
+
+// Function to generate metadata
+export async function generateMetadata(
+  prompt: string,
+  documentIds: number[],
+): Promise<MetadataGenerationResponse> {
+  const response = await fetch(
+    `https://flask-pr-363.up.railway.app/generateMetadata`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        metadata_prompt: prompt,
+        document_ids: documentIds,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to generate metadata')
+  }
+
+  return response.json()
+}
+
+// Function to check document statuses
+export async function getDocumentStatuses(
+  documentIds: number[],
+  runId: number,
+): Promise<DocumentStatus[]> {
+  const response = await fetch(`/api/UIUC-api/getDocumentStatuses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      document_ids: documentIds,
+      run_id: runId,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get document statuses')
+  }
+
+  return response.json()
+}
+
+// Function to download metadata CSV
+export async function downloadMetadataCSV(runIds: number[]): Promise<Blob> {
+  const response = await fetch(
+    `https://flask-pr-363.up.railway.app/downloadMetadataCSV`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        run_ids: runIds,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to download metadata CSV')
+  }
+
+  return response.blob()
+}
+
+export interface MetadataDocument {
+  id: number
+  readable_filename: string
+  metadata_status: 'completed' | 'failed' | 'running' | null
+}
+
+// Function to get metadata documents from cedar_documents table
+export async function getMetadataDocuments(
+  courseName: string,
+): Promise<MetadataDocument[]> {
+  const response = await fetch(
+    `/api/UIUC-api/getMetadataDocuments?course_name=${encodeURIComponent(courseName)}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to get metadata documents: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export interface MetadataField {
+  document_id: number
+  field_name: string
+  field_value: any
+  confidence_score: number | null
+  extraction_method: string | null
+  run_status: 'in_progress' | 'completed' | 'failed'
+  last_error?: string
+}
+
+export async function getMetadataFields(
+  runId: number,
+): Promise<MetadataField[]> {
+  const response = await fetch(
+    `/api/UIUC-api/getMetadataFields?run_id=${runId}`,
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch metadata fields')
+  }
+
+  const data = await response.json()
+  return data.metadata || []
+}
+
 // Export all functions as part of the API Utils module
-export default {
+const apiUtils = {
   callSetCourseMetadata,
   uploadToS3,
   fetchPresignedUrl,
   fetchCourseMetadata,
+  getMetadataDocuments,
+  getMetadataFields,
 }
+
+export default apiUtils
