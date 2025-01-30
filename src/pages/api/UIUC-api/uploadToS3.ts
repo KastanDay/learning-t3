@@ -4,9 +4,6 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 
 const region = process.env.AWS_REGION
-// const accessKey = process.env.MINIO_KEY || process.env.AWS_KEY
-// const secretKey = process.env.MINIO_SECRET || process.env.AWS_SECRET
-// const bucketName = process.env.MINIO_BUCKET_NAME || process.env.S3_BUCKET_NAME
 
 // S3 Client configuration
 let s3Client: S3Client | null = null
@@ -44,7 +41,8 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const s3_filepath = `courses/${courseName}/${uniqueFileName}`
 
     let post
-    if (courseName == "vyriad") {
+    if (courseName === "vyriad") {
+      console.log("In the vyriad if statement")
       if (!vyriadMinioClient) {
         throw new Error('MinIO client not configured - missing required environment variables')
       }
@@ -53,7 +51,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         Key: s3_filepath,
         Expires: 60 * 60, // 1 hour
       })
-
     } else {
       if (!s3Client) {
         throw new Error('S3 client not configured - missing required environment variables')
@@ -64,6 +61,8 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         Expires: 60 * 60, // 1 hour
       })
     }
+
+    console.log("Upload to s3", post)
 
     res
       .status(200)
