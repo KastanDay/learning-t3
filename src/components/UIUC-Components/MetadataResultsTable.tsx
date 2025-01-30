@@ -38,11 +38,11 @@ export function MetadataResultsTable({
   const [sorting, setSorting] = useState<SortingState>([])
 
   const columns = [
-    columnHelper.accessor('id', {
+    columnHelper.accessor('document_id', {
       header: 'Document',
       cell: (info) => documentNames[info.getValue()] || info.getValue(),
     }),
-    columnHelper.accessor('metadata_status', {
+    columnHelper.accessor('run_status', {
       header: 'Status',
       cell: (info) => (
         <Text

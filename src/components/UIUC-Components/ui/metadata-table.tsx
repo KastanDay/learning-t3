@@ -70,19 +70,6 @@ function DocumentTable({
       },
     ]
 
-    if (document.run_status === 'in_progress') {
-      return [
-        ...baseColumns,
-        {
-          accessorKey: 'value',
-          header: 'Value',
-          cell: () => (
-            <div className="h-6 w-24 animate-pulse rounded-md bg-gray-700/50" />
-          ),
-        },
-      ]
-    }
-
     if (subfields.length > 0) {
       return [
         ...baseColumns,
@@ -123,6 +110,15 @@ function DocumentTable({
         header: 'Value',
         cell: ({ row }) => {
           const value = row.original.value
+          // Show loading state only if the value is undefined/null and document is in progress
+          if (
+            document.run_status === 'in_progress' &&
+            (value === undefined || value === null)
+          ) {
+            return (
+              <div className="h-6 w-24 animate-pulse rounded-md bg-gray-700/50" />
+            )
+          }
           return (
             <TableCell
               className={cn(
