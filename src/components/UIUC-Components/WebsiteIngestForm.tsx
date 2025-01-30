@@ -134,7 +134,8 @@ export default function WebsiteIngestForm({
         name: url,
         status: 'uploading',
         type: 'webscrape',
-        url: url
+        url: url,
+        isBaseUrl: true
       }
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
 

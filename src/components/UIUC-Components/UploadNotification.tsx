@@ -29,6 +29,7 @@ export interface FileUpload {
   type: 'document' | 'webscrape' | 'canvas' | 'github' | 'mit'
   url?: string
   error?: string
+  isBaseUrl?: boolean
 }
 
 interface FailedDocumentsResponse {
@@ -171,14 +172,14 @@ function UploadNotificationContent({
     return text.slice(0, maxLength) + '...'
   }
 
-  const getStatusMessage = (status: FileUpload['status'], url?: string, type?: string) => {
+  const getStatusMessage = (status: FileUpload['status'], url?: string, type?: string, isBaseUrl?: boolean) => {
     // if (url) return truncateText(url, 35)
 
     switch (status) {
       case 'uploading':
-        return type === 'webscrape' || type === 'github' ? 'Web crawling...' : 'Uploading to secure storage...'
+        return url && isBaseUrl ? 'Crawling this website...' : type === 'webscrape' || type === 'github' ? 'Crawling this website...' : 'Uploading to secure storage...'
       case 'ingesting':
-        return 'Processing for chat...'
+        return url && isBaseUrl ? 'Crawling this website...' : 'Processing for chat...'
       case 'complete':
         return 'Ready for chat'
       case 'error':
@@ -279,7 +280,7 @@ function UploadNotificationContent({
                       className={`truncate text-[#8e8eb2] ${montserrat_paragraph.variable} font-montserratParagraph`}
                       title={getStatusMessage(file.status)}
                     >
-                      {getStatusMessage(file.status, file.url, file.type)}
+                      {getStatusMessage(file.status, file.url, file.type, file.isBaseUrl)}
                     </Text>
                   </div>
                   <div className="ml-2 flex items-center">
