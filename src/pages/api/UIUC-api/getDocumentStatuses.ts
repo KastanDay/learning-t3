@@ -10,17 +10,18 @@ export default async function handler(
   }
 
   try {
-    const { document_ids } = req.body
+    const { document_ids, run_id } = req.body
 
-    if (!document_ids || !Array.isArray(document_ids)) {
-      return res.status(400).json({ error: 'Invalid document_ids parameter' })
+    if (!document_ids || !Array.isArray(document_ids) || !run_id) {
+      return res.status(400).json({ error: 'Invalid parameters' })
     }
 
-    // Get document statuses from Supabase
+    // Get document statuses from cedar_runs table
     const { data, error } = await supabase
-      .from('cedar_documents')
-      .select('id, metadata_status, last_error')
-      .in('id', document_ids)
+      .from('cedar_runs')
+      .select('document_id, run_status, last_error')
+      .eq('run_id', run_id)
+      .in('document_id', document_ids)
 
     if (error) {
       throw error

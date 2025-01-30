@@ -289,8 +289,8 @@ export interface MetadataGenerationResponse {
 }
 
 export interface DocumentStatus {
-  id: number
-  metadata_status: 'completed' | 'failed' | 'running'
+  document_id: number
+  run_status: 'in_progress' | 'completed' | 'failed'
   last_error?: string
 }
 
@@ -323,6 +323,7 @@ export async function generateMetadata(
 // Function to check document statuses
 export async function getDocumentStatuses(
   documentIds: number[],
+  runId: number,
 ): Promise<DocumentStatus[]> {
   const response = await fetch(`/api/UIUC-api/getDocumentStatuses`, {
     method: 'POST',
@@ -331,6 +332,7 @@ export async function getDocumentStatuses(
     },
     body: JSON.stringify({
       document_ids: documentIds,
+      run_id: runId,
     }),
   })
 
@@ -391,11 +393,13 @@ export async function getMetadataDocuments(
 }
 
 export interface MetadataField {
+  document_id: number
   field_name: string
   field_value: any
   confidence_score: number | null
   extraction_method: string | null
-  document_id: number
+  run_status: 'in_progress' | 'completed' | 'failed'
+  last_error?: string
 }
 
 export async function getMetadataFields(

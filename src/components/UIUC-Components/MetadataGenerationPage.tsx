@@ -4,11 +4,7 @@ import {
   Flex,
   Text,
   ScrollArea,
-  ActionIcon,
-  Tooltip,
-  Alert,
   Group,
-  Table,
   Modal,
   CopyButton,
   Button,
@@ -16,11 +12,10 @@ import {
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useMediaQuery } from '@mantine/hooks'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   IconDownload,
   IconRefresh,
-  IconAlertCircle,
   IconCopy,
   IconCheck,
 } from '@tabler/icons-react'
@@ -37,14 +32,11 @@ import {
   getMetadataDocuments,
   getMetadataFields,
   type DocumentStatus,
-  type MetadataDocument,
-  type MetadataField,
 } from '~/utils/apiUtils'
-import { MetadataResultsTable } from './MetadataResultsTable'
+import { MetadataTable } from './ui/metadata-table'
 import { Textarea } from './ui/textarea'
 import { MultiSelect } from './ui/multi-select'
 import { cn } from '~/lib/utils'
-import { MetadataTable, columns } from './ui/metadata-table'
 
 // Types for metadata generation
 interface MetadataRun {
@@ -172,29 +164,40 @@ export default function MetadataGenerationPage({
       onSuccess: (data) => {
         setCurrentRunId(data.run_id)
         queryClient.invalidateQueries({ queryKey: ['documentStatuses'] })
+        queryClient.invalidateQueries({ queryKey: ['metadataHistory'] })
       },
     })
 
   // Query for document statuses
   const { data: documentStatuses = [], isLoading: isLoadingStatuses } =
     useQuery({
-      queryKey: ['documentStatuses', selectedDocumentIds],
-      queryFn: () => getDocumentStatuses(selectedDocumentIds.map(Number)),
+      queryKey: ['documentStatuses', selectedDocumentIds, currentRunId],
+      queryFn: () =>
+        getDocumentStatuses(selectedDocumentIds.map(Number), currentRunId!),
       enabled: currentRunId !== null,
       refetchInterval: (query: Query<DocumentStatus[], Error>) => {
-        // If any document is still running, poll every 5 seconds
-        if (
-          query.state.data?.some((doc) => doc.metadata_status === 'running')
-        ) {
+        // If any document is still in progress, poll every 5 seconds
+        if (query.state.data?.some((doc) => doc.run_status === 'in_progress')) {
           return 5000
         }
         return false
       },
     })
 
+  // Watch for completion and update state
+  useEffect(() => {
+    if (
+      documentStatuses.length > 0 &&
+      documentStatuses.every((doc) => doc.run_status === 'completed')
+    ) {
+      queryClient.invalidateQueries({ queryKey: ['metadataHistory'] })
+      setCurrentRunId(null) // Re-enable the form
+    }
+  }, [documentStatuses, queryClient])
+
   // Mutation for downloading CSV
   const { mutate: downloadCSV, isPending: isDownloading } = useMutation({
-    mutationFn: () => downloadMetadataCSV(currentRunId ? [currentRunId] : []),
+    mutationFn: (runIds: number[]) => downloadMetadataCSV(runIds),
     onSuccess: (blob) => {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -209,11 +212,9 @@ export default function MetadataGenerationPage({
 
   // Check if all documents are processed
   const isAllCompleted = documentStatuses?.every(
-    (doc) => doc.metadata_status !== 'running',
+    (doc) => doc.run_status !== 'in_progress',
   )
-  const hasError = documentStatuses?.some(
-    (doc) => doc.metadata_status === 'failed',
-  )
+  const hasError = documentStatuses?.some((doc) => doc.run_status === 'failed')
 
   // Query for metadata history
   const { data: historyData = [], isLoading: isLoadingHistory } = useQuery({
@@ -250,9 +251,39 @@ export default function MetadataGenerationPage({
         console.log('Fetching current metadata for run ID:', currentRunId)
         const data = await getMetadataFields(currentRunId!)
         console.log('Current metadata response:', data)
-        return data
+
+        // Transform data to have one row per document
+        const documentRows = new Map<number, any>()
+
+        data.forEach((field) => {
+          if (!documentRows.has(field.document_id)) {
+            documentRows.set(field.document_id, {
+              document_id: field.document_id,
+              document_name: documentNames[field.document_id],
+              run_status:
+                documentStatuses?.find(
+                  (doc) => doc.document_id === field.document_id,
+                )?.run_status || 'in_progress',
+              last_error: documentStatuses?.find(
+                (doc) => doc.document_id === field.document_id,
+              )?.last_error,
+            })
+          }
+
+          const row = documentRows.get(field.document_id)
+          row[field.field_name] = field.field_value
+        })
+
+        return Array.from(documentRows.values())
       },
-      enabled: currentRunId !== null && isAllCompleted && !hasError,
+      enabled: currentRunId !== null,
+      refetchInterval: (query: Query<any[], Error>) => {
+        // If any document is still in progress, poll every 5 seconds
+        if (documentStatuses?.some((doc) => doc.run_status === 'in_progress')) {
+          return 5000
+        }
+        return false
+      },
     })
 
   // Query for metadata fields for history item
@@ -266,10 +297,42 @@ export default function MetadataGenerationPage({
         )
         const data = await getMetadataFields(selectedHistoryRun!.run_id)
         console.log('History metadata response:', data)
-        return data
+
+        // Transform data to have one row per document
+        const documentRows = new Map<number, any>()
+
+        data.forEach((field) => {
+          if (!documentRows.has(field.document_id)) {
+            documentRows.set(field.document_id, {
+              document_id: field.document_id,
+              document_name: documentNames[field.document_id],
+              run_status: 'completed' as const,
+            })
+          }
+
+          const row = documentRows.get(field.document_id)
+          row[field.field_name] = field.field_value
+        })
+
+        return Array.from(documentRows.values())
       },
       enabled: selectedHistoryRun !== null && !currentRunId,
     })
+
+  // If we have a current run but no metadata yet, show loading state for selected documents
+  const loadingMetadata =
+    currentRunId && !currentMetadata.length
+      ? selectedDocumentIds.map((id) => ({
+          document_id: Number(id),
+          document_name: documentNames[Number(id)],
+          run_status:
+            documentStatuses?.find((doc) => doc.document_id === Number(id))
+              ?.run_status || 'in_progress',
+          last_error: documentStatuses?.find(
+            (doc) => doc.document_id === Number(id),
+          )?.last_error,
+        }))
+      : []
 
   // Function to handle history item click
   const handleHistoryClick = (run: MetadataRun) => {
@@ -327,7 +390,7 @@ export default function MetadataGenerationPage({
                     order={2}
                     className={`${montserrat_heading.variable} font-montserratHeading text-lg text-white/90 sm:text-2xl`}
                   >
-                    Metadata
+                    Deep Research
                   </Title>
                   <Text className="text-white/60">/</Text>
                   <Title
@@ -483,7 +546,7 @@ export default function MetadataGenerationPage({
                               className="h-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                downloadCSV()
+                                downloadCSV([run.run_id])
                               }}
                             >
                               <IconDownload className="h-4 w-4" />
@@ -528,8 +591,7 @@ export default function MetadataGenerationPage({
       </Card>
 
       {/* Results Table */}
-      {((currentRunId && isAllCompleted && !hasError) ||
-        selectedHistoryRun) && (
+      {(currentRunId || selectedHistoryRun) && (
         <Card
           shadow="xs"
           padding="none"
@@ -549,7 +611,7 @@ export default function MetadataGenerationPage({
                   className={`${montserrat_heading.variable} font-montserratHeading text-lg text-white/90 sm:text-2xl`}
                 >
                   {currentRunId
-                    ? 'Run #4 Metadata'
+                    ? `Run #${currentRunId} Metadata`
                     : `Run #${selectedHistoryRun!.run_id} Metadata`}
                 </Title>
 
@@ -558,7 +620,9 @@ export default function MetadataGenerationPage({
                   <Button
                     variant="subtle"
                     size="sm"
-                    onClick={() => downloadCSV()}
+                    onClick={() =>
+                      downloadCSV([currentRunId || selectedHistoryRun!.run_id])
+                    }
                     className="rounded-md bg-purple-800 text-white hover:bg-indigo-600"
                     disabled={isDownloading}
                     leftIcon={<IconDownload className="h-4 w-4" />}
@@ -574,32 +638,26 @@ export default function MetadataGenerationPage({
                 <div className="flex h-32 items-center justify-center rounded-xl bg-[#15162c] text-white/60">
                   <Text>Loading metadata...</Text>
                 </div>
-              ) : (currentRunId ? currentMetadata : historyMetadata).length ===
-                0 ? (
+              ) : currentRunId ? (
+                <div className="max-h-[calc(80vh-16rem)] overflow-y-auto rounded-xl">
+                  <MetadataTable
+                    data={
+                      currentMetadata.length ? currentMetadata : loadingMetadata
+                    }
+                    onViewJson={setJsonDialogData}
+                  />
+                </div>
+              ) : historyMetadata.length === 0 ? (
                 <div className="flex h-32 items-center justify-center rounded-xl bg-[#15162c] text-white/60">
                   <Text>No metadata available</Text>
                 </div>
               ) : (
-                <ScrollArea.Autosize
-                  mah="calc(80vh - 16rem)"
-                  type="always"
-                  offsetScrollbars
-                  className="overflow-hidden rounded-xl"
-                >
+                <div className="max-h-[calc(80vh-16rem)] overflow-y-auto rounded-xl">
                   <MetadataTable
-                    columns={columns}
-                    data={(currentRunId
-                      ? currentMetadata
-                      : historyMetadata
-                    ).map((field) => ({
-                      ...field,
-                      document_name:
-                        documentNames[field.document_id] ||
-                        `Document ${field.document_id}`,
-                    }))}
+                    data={historyMetadata}
                     onViewJson={setJsonDialogData}
                   />
-                </ScrollArea.Autosize>
+                </div>
               )}
             </div>
           </div>
