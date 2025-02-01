@@ -1,3 +1,8 @@
+/**
+ * This file handles the rendering of course cards on the index page of the application.
+ * Each course card displays information about a specific course, including the course slug, image, title, badge, and description.
+ */
+
 import Image from 'next/image'
 import { type NextPage } from 'next'
 import Head from 'next/head'
@@ -20,6 +25,12 @@ import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHe
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 
+/**
+ * Home page of the application.
+ * Renders the main structure and components of the index page, including head, headers, main content,
+ * and footer.
+ * It serves as the entry point for users exploring the courses and other features.
+ */
 const Home: NextPage = () => {
   return (
     <>
@@ -226,6 +237,11 @@ const useStyles = createStyles((theme) => ({
   },
 }))
 
+/**
+ * This function creates feature cards from the provided mock data.
+ * It utilizes the useStyles hook for styles and iterates over mock data to build each card.
+ * The cards are then displayed in a responsive grid.
+ */
 export function FeaturesCards() {
   const { classes, theme } = useStyles()
   const features = mockdata.map((feature) => (
@@ -269,6 +285,11 @@ export function FeaturesCards() {
 }
 
 // TODO: USE BETTER CARDS! https://ui.mantine.dev/category/article-cards
+/**
+ * This function generates the course cards to be displayed on the index page.
+ * It does not take any inputs and does not have any outputs.
+ * The course cards are hardcoded in the function.
+ */
 function CourseCard() {
   const cards = [
     {
