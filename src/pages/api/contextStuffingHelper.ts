@@ -1,3 +1,10 @@
+/**
+ * This file contains helper functions for context stuffing in the chat interface.
+ * Context stuffing is the process of taking a user's input and additional context
+ * (like documents, course names, etc.) and constructing a prompt for the AI to generate
+ * a relevant and informed response.
+ */
+
 import { ContextWithMetadata } from '~/types/chat'
 
 import tiktokenModel from '@dqbd/tiktoken/encoders/cl100k_base.json'
@@ -77,6 +84,8 @@ export async function getStuffedPrompt(
 
     let tokenCounter = encoding.encode(system_prompt + searchQuery).length
     const validDocs = []
+    // Iterate through the document contexts and encode each one.
+    // Add the encoded document to validDocs only if it fits within the token limit.
     for (const [index, d] of contexts.entries()) {
       const docString = `---\n${index + 1}: ${d.readable_filename}${
         d.pagenumber ? ', page: ' + d.pagenumber : ''
@@ -86,6 +95,8 @@ export async function getStuffedPrompt(
       //   `token_counter: ${tokenCounter}, num_tokens: ${numTokens}, token_limit: ${tokenLimit}`,
       // )
       if (tokenCounter + numTokens <= tokenLimit) {
+        // If the current document's tokens fit within the remaining token limit,
+        // update the tokenCounter and add the document to the validDocs array.
         tokenCounter += numTokens
         validDocs.push({ index, d })
       } else {
