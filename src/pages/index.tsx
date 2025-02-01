@@ -327,6 +327,14 @@ function CourseCard() {
       description:
         "Using all of Ansible's documentation, this bot will write excellent Ansible scripts. Just ask it to program whatever you'd like.",
     },
+    /**
+     * Course Card: Lilian Wang Blog (OpenAI popular topics)
+     * This course card provides access to a collection of Lilian Wang's blog posts, some of the best in the AI world.
+     * The course_slug is 'lilian-weng-blog'.
+     * The title of the course card is 'Lilian Wang Blog (OpenAI popular topics)'.
+     * The badge displayed on the course card is 'LLMs'.
+     * The description provides a link to Lilian Wang's blog: https://lilianweng.github.io.
+     */
     {
       course_slug: 'lilian-weng-blog',
       // imageSrc: '/media/hero_courses_banners/lilian_weng_blog.png',
