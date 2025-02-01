@@ -53,7 +53,7 @@ const shouldShowFields = (inputUrl: string) => {
   )
 }
 
-const validateUrl = (url: string) => {
+export const validateUrl = (url: string) => {
   const courseraRegex = /^https?:\/\/(www\.)?coursera\.org\/learn\/.+/
   const mitRegex = /^https?:\/\/ocw\.mit\.edu\/.+/
   const githubRegex = /^https?:\/\/(www\.)?github\.com\/.+/
@@ -69,7 +69,7 @@ const validateUrl = (url: string) => {
   )
 }
 
-const formatUrl = (url: string) => {
+export const formatUrl = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     url = 'http://' + url
   }
@@ -147,7 +147,19 @@ export const WebScrape = ({
     }
   }
 
-  const handleSubmit = async () => {
+export const handleSubmit = async (
+    url: string,
+    courseName: string,
+    courseOptions: {
+      maxUrls: string,
+      maxDepth: string,
+      stayOnBaseUrl: boolean,
+      selectedCanvasOptions: string[],
+    },
+    isNewCourse: boolean,
+    user: { email: string },
+    router: any,
+  ) => {
     if (validateUrl(url)) {
       setLoadingSpinner(true)
 
