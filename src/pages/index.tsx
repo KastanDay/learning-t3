@@ -161,7 +161,7 @@ import { createStyles, SimpleGrid, Container } from '@mantine/core'
 import { IconGauge, IconUser, IconCookie } from '@tabler/icons-react'
 import ListProjectTable from '~/components/UIUC-Components/ProjectTable'
 
-const mockdata = [
+export const mockdata = [
   {
     title: 'Faster than ChatGPT, with better prompts',
     description:
