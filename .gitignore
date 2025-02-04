@@ -46,3 +46,6 @@ yarn-error.log*
 .cursorrules
 
 tests_output/
+
+# Docker
+docker-compose-log.txt
